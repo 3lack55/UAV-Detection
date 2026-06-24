@@ -6,15 +6,19 @@ import { protect } from '../middlewares/authMiddleware.js';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const authRouter = express.Router();
 
-// Multer configuration for profile images
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, '../../uploads/user_profile'));
+        const targetDir = path.join(__dirname, '../../uploads/user_profile');
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true }); 
+        }
+        cb(null, targetDir);
     },
     filename: (req, file, cb) => {
         const timestamp = Date.now();
@@ -29,7 +33,7 @@ const upload = multer({
         if (allowedMimes.includes(file.mimetype)) {
             cb(null, true);
         } else {
-            cb(new Error('รองรับเฉพาะรูปภาพ'));
+            cb(new Error('รองรับเฉพาะรูปภาพประเภท JPG, PNG, GIF และ WEBP เท่านั้น'));
         }
     }
 });
@@ -144,19 +148,25 @@ authRouter.post('/change-password', protect, async (req, res) => {
 });
 
 // Upload profile image
-authRouter.post('/upload-profile-image', protect, upload.single('profileImage'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'ไม่มีรูปภาพ' });
+authRouter.post('/upload-profile-image', protect, (req, res, next) => {
+    upload.single('profileImage')(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ success: false, message: err.message });
         }
 
-        const filename = req.file.filename;
-        await doQuery('UPDATE users SET profile_image = ? WHERE user_id = ?', [filename, req.user.user_id]);
-        
-        res.json({ success: true, message: 'อัปโหลดรูปภาพสำเร็จ', filename });
-    } catch (error) {
-        res.status(500).json({ success: false, message: 'Server error', error: error.message });
-    }
+        try {
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: 'ไม่มีรูปภาพ' });
+            }
+
+            const filename = req.file.filename;
+            await doQuery('UPDATE users SET profile_image = ? WHERE user_id = ?', [filename, req.user.user_id]);
+            
+            res.json({ success: true, message: 'อัปโหลดรูปภาพสำเร็จ', filename });
+        } catch (error) {
+            res.status(500).json({ success: false, message: 'Server error', error: error.message });
+        }
+    });
 });
 
 authRouter.post('/userQuery', protect, async (req, res) => {
