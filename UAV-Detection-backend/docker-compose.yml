@@ -1,0 +1,36 @@
+services:
+  # MySQL Service
+  bobo_mysql:
+    image: mysql:5.7
+    container_name: bobo_uav_sql
+    ports:
+      - "13306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: uav_detection
+      MYSQL_USER: bobo
+      MYSQL_PASSWORD: 000000000
+    volumes:
+      - ./mysql-data:/var/lib/mysql
+    networks:
+      - bobo_uav_net
+
+  # Node.js Backend Service
+  bobo_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bobo_uav_backend
+    ports:
+      - "13000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - bobo_mysql
+    networks:
+      - bobo_uav_net
+
+networks:
+  bobo_uav_net:
