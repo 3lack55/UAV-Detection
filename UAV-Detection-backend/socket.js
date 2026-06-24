@@ -227,7 +227,7 @@ async function writeEventData(eventId, cameraId, data) {
 async function checkEventTimeouts() {
     const now = Date.now();
     for (const [cameraId, eventData] of events.entries()) {
-        if (now - new Date(eventData.lastActivity).getTime() > eventTimeout) {
+        if (now - eventData.lastActivity > eventTimeout) {
             console.log(`Event for camera${cameraId} has timed out. Ending event.`);
             await endEvent(cameraId);
         }
@@ -253,7 +253,7 @@ async function uavEventHandler(data) {
                 console.error(`Failed to create event for camera${cameraId}`);
                 return;
             }
-            events.set(cameraId, { lastActivity: timestamp, eventId: eventId });
+            events.set(cameraId, { lastActivity: Date.now(), eventId: eventId });
             await writeEventData(eventId, cameraId, data);
             
             // Broadcast when new event detected
@@ -265,7 +265,7 @@ async function uavEventHandler(data) {
                 return;
             }
             const eventId = eventData.eventId;
-            events.set(cameraId, { lastActivity: timestamp, eventId: eventId });
+            events.set(cameraId, { lastActivity: Date.now(), eventId: eventId });
             await writeEventData(eventId, cameraId, data);
         }
     } catch (error) {
