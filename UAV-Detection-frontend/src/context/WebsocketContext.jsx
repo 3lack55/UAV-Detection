@@ -12,9 +12,10 @@ export function WebSocketProvider({ children }) {
     const reconnectIntervalRef = useRef(null);
     const shouldReconnectRef = useRef(true);
     const isInitializedRef = useRef(false);
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
     const [connected, setConnected] = useState(false);
     const [lastMessage, setLastMessage] = useState(null);
+    const [realtimeEvent, setRealtimeEvent] = useState(null);
     const [reconnecting, setReconnecting] = useState(false);
 
     const RECONNECT_INTERVAL = 5000; // 5 seconds
@@ -56,10 +57,25 @@ export function WebSocketProvider({ children }) {
                     return;
                 }
                 
-                // Handle other messages
-                setLastMessage(parsedData.data);
-            } catch  {
-                setLastMessage(event.data);
+                if (parsedData.type === 'system_update') {
+                    setRealtimeEvent(parsedData);
+                    return;
+                }
+
+                if (parsedData.type === 'auth_required') {
+                    shouldReconnectRef.current = false;
+                    logout();
+                    setConnected(false);
+                    setReconnecting(false);
+                    return;
+                } 
+
+                if (parsedData.type === 'status_update') {
+                    setLastMessage(parsedData.data);
+                    return;
+                }
+            } catch (error) {
+                console.error("Error parsing WebSocket message:", error);
             }
         };
 
@@ -138,7 +154,7 @@ export function WebSocketProvider({ children }) {
     };
 
     return (
-        <WebSocketContext.Provider value={{ connected, lastMessage, sendMessage, reconnecting }}>
+        <WebSocketContext.Provider value={{ connected, lastMessage, realtimeEvent, sendMessage, reconnecting }}>
             {children}
         </WebSocketContext.Provider>
     );

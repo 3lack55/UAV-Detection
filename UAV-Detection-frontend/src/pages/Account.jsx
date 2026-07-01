@@ -270,11 +270,11 @@ export default function Account() {
             <style dangerouslySetInnerHTML={{
                 __html: `
                 .parent-container {overflow-x: hidden;}
-                .parent-container::-webkit-scrollbar { width: 3px; }
+                .parent-container::-webkit-scrollbar { width: 0px; }
                 .parent-container::-webkit-scrollbar-track { background: #0f172a; }
                 .parent-container::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.3); border-radius: 10px; }
 
-                .custom-scrollbar::-webkit-scrollbar { height: 3px; }
+                .custom-scrollbar::-webkit-scrollbar { height: 0px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
                 

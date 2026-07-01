@@ -5,9 +5,9 @@ import CameraList from "../components/CameraList";
 import { Link } from "react-router-dom";
 
 export default function SystemControl() {
-    const [activeTab, setActiveTab] = useState("general");
+    const [activeTab, setActiveTab] = useState("users");
 
-    {/*UsersList*/ }
+    {/* UsersList */ }
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
     const [stats, setStats] = useState({ total: 0, admin: 0, banned: 0 });
@@ -17,11 +17,11 @@ export default function SystemControl() {
             <style dangerouslySetInnerHTML={{
                 __html: `
                     .parent-container {overflow-x: hidden;}
-                    .parent-container::-webkit-scrollbar { width: 3px; }
+                    .parent-container::-webkit-scrollbar { width: 0px; }
                     .parent-container::-webkit-scrollbar-track { background: #0f172a; }
                     .parent-container::-webkit-scrollbar-thumb { background: rgb(255 255 255 / 0.3); border-radius: 10px; }
 
-                    .custom-scrollbar::-webkit-scrollbar { height: 3px; width: 3px; }
+                    .custom-scrollbar::-webkit-scrollbar { height: 0px; }
                     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
                     .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
                 
@@ -116,10 +116,10 @@ export default function SystemControl() {
                     <div className="lg:w-[320px] w-full lg:flex lg:flex-col justify-between lg:px-4 lg:m-0 lg:pb-0 lg:border-r lg:border-b-0 lg:border-slate-700 sticky top-0 bg-slate-900 lg:bg-transparent" >
                         <div className="flex gap-4 lg:flex-col lg:gab">
                             {[
-                                { id: "general", label: "ทั่วไป", icon: Settings },
+                                // { id: "general", label: "ทั่วไป", icon: Settings },
                                 { id: "users", label: "ผู้ใช้งาน", icon: Users },
                                 { id: "camera", label: "กล้อง", icon: Camera },
-                                { id: "about", label: "เกี่ยวกับ", icon: Info },
+                                // { id: "about", label: "เกี่ยวกับ", icon: Info },
                             ].map((tab) => {
                                 const IconComponent = tab.icon;
                                 return (

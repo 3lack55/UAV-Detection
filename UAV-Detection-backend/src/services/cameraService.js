@@ -1,6 +1,7 @@
 import express from "express";  
 import { doQuery } from "../database/mysqlConnection.js";
 import { protect } from "../middlewares/authMiddleware.js";
+import { broadcastSystemUpdate } from "../../socket.js";
 
 const cameraRouter = express.Router();
 
@@ -38,8 +39,9 @@ cameraRouter.get("/getCameraPermissionsByUser/:userId", protect, async (req, res
 cameraRouter.patch("/updateCamera/:cameraId", protect, async (req, res) => {
     try {
         if (!req.params.cameraId) return res.status(400).json({ success: false, message: "Camera ID is required."});
-        const result = await doQuery(`UPDATE cameras SET camera_name = '${req.body.camera_name}', latitude = ${req.body.latitude}, longitude = ${req.body.longitude}, status = '${req.body.status}' WHERE camera_id = ${req.params.cameraId}`);
+        const result = await doQuery(`UPDATE cameras SET camera_name = '${req.body.camera_name}', latitude = ${req.body.latitude}, longitude = ${req.body.longitude}, status = '${req.body.status}', last_update = NOW() WHERE camera_id = ${req.params.cameraId}`);
         if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Camera ID ${req.params.cameraId} not found.`});
+        broadcastSystemUpdate("camera_changed", { action: "updated", cameraId: req.params.cameraId, camera: { camera_id: req.params.cameraId, ...req.body } });
         res.status(200).json({ success: true, message: `Updated camera with ID ${req.params.cameraId}.`});
     } catch (err) {
         console.error("Error updating camera:", err);
@@ -49,34 +51,64 @@ cameraRouter.patch("/updateCamera/:cameraId", protect, async (req, res) => {
 
 cameraRouter.post("/addCamera", protect, async (req, res) => {
     try {
-        await doQuery(`INSERT INTO cameras (camera_name, latitude, longitude, status) VALUE ('${req.body.camera_name}', ${req.body.latitude}, ${req.body.longitude}, '${req.body.status}')`);
-        res.status(201).json({ success: true, message: 'Added new camera.' });
+        const result = await doQuery(`INSERT INTO cameras (camera_name, latitude, longitude, status, last_update) VALUES ('${req.body.camera_name}', ${req.body.latitude}, ${req.body.longitude}, '${req.body.status}', NOW())`);
+        const cameraId = result.insertId;
+        broadcastSystemUpdate("camera_changed", { action: "created", camera: { camera_id: cameraId, ...req.body } });
+        res.status(201).json({ success: true, message: 'Added new camera.', data: { camera_id: cameraId, ...req.body } });
     } catch (err) {
         console.error("Error adding new camera:", err);
         res.status(500).json({ success: false, message: "Failed to add new camera." });
     }
 });
 
+cameraRouter.delete("/deleteCamera/:cameraId", protect, async (req, res) => {
+    try {
+        if (!req.params.cameraId) return res.status(400).json({ success: false, message: "Camera ID is required." });
+        const result = await doQuery(`DELETE FROM cameras WHERE camera_id = ${req.params.cameraId}`);
+        if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Camera ID ${req.params.cameraId} not found.` });
+        broadcastSystemUpdate("camera_changed", { action: "deleted", cameraId: req.params.cameraId });
+        res.status(200).json({ success: true, message: `Deleted camera with ID ${req.params.cameraId}.` });
+    } catch (err) {
+        console.error("Error deleting camera:", err);
+        res.status(500).json({ success: false, message: "Failed to delete camera." });
+    }
+});
+
 cameraRouter.post("/assignCamera", protect, async (req, res) => {
     try {
         const existingPermission = await doQuery(`SELECT * FROM camera_assignments WHERE user_id = ${req.body.user_id} AND camera_id = ${req.body.camera_id}`);
-        console.log(existingPermission.length);
         if (existingPermission.length > 0) {
             if (req.body.permission_level === "unassigned") {
                 const result = await doQuery(`DELETE FROM camera_assignments WHERE user_id = ${req.body.user_id} AND camera_id = ${req.body.camera_id}`);
                 if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Failed unassign permission level.`});
+                broadcastSystemUpdate("permission_changed", { userId: req.body.user_id, cameraId: req.body.camera_id, permissionLevel: null, action: "removed" });
                 return res.status(200).json({ success: true, message: `Unassigned permission for user id ${req.body.user_id} to camera id ${req.body.camera_id}.`});
             }
 
             const result = await doQuery(`UPDATE camera_assignments SET permission_level = '${req.body.permission_level}' WHERE user_id = ${req.body.user_id} AND camera_id = ${req.body.camera_id}`);
             if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Failed assign permission level.`});
-            res.status(200).json({ success: true, message: `Updated permission level for user id ${req.body.user_id} to camera id ${req.body.camera_id}, permission: ${req.body.permission_level}.`});
+            broadcastSystemUpdate("permission_changed", { userId: req.body.user_id, cameraId: req.body.camera_id, permissionLevel: req.body.permission_level, action: "updated" });
+            return res.status(200).json({ success: true, message: `Updated permission level for user id ${req.body.user_id} to camera id ${req.body.camera_id}, permission: ${req.body.permission_level}.`});
         }
         await doQuery(`INSERT INTO camera_assignments (user_id, camera_id, permission_level) VALUE (${req.body.user_id}, ${req.body.camera_id}, '${req.body.permission_level}')`);
+        broadcastSystemUpdate("permission_changed", { userId: req.body.user_id, cameraId: req.body.camera_id, permissionLevel: req.body.permission_level, action: "created" });
         res.status(201).json({ success: true, message: `Assigned new permission to user id ${req.body.user_id}.` });
     } catch (err) {
         console.error("Error for permission assign:", err);
         res.status(500).json({ success: false, message: "Failed assign permission level." });
+    }
+});
+
+cameraRouter.patch("/updateStatus/:cameraId", async (req, res) => {
+    try {
+        if (!req.params.cameraId) return res.status(400).json({ success: false, message: "Camera ID is required." });
+        const result = await doQuery(`UPDATE cameras SET status = '${req.body.status}', last_update = NOW() WHERE camera_id = ${req.params.cameraId}`);
+        if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Camera ID ${req.params.cameraId} not found.` });
+        broadcastSystemUpdate("camera_changed", { action: "status_updated", cameraId: req.params.cameraId, status: req.body.status });
+        res.status(200).json({ success: true, message: `Updated status for camera with ID ${req.params.cameraId}.` });
+    } catch (err) {
+        console.error("Error updating camera status:", err);
+        res.status(500).json({ success: false, message: "Failed to update camera status." });
     }
 });
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react"
 import { useAuth } from "../context/AuthContext";
+import { useWebSocket } from "../context/WebsocketContext";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
@@ -87,6 +88,7 @@ function ProfileModal({ user: targetUser, open, onClose, apiBase, token }) {
 
 export default function UserList({ search, setSearch, roleFilter, setRoleFilter, onStatsUpdate }) {
     const { user } = useAuth();
+    const { realtimeEvent } = useWebSocket();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -121,8 +123,32 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                 setLoading(false);
             }
         };
-        fetchUsers();
-    }, []);
+
+        if (user?.token) {
+            fetchUsers();
+        }
+    }, [user?.token]);
+
+    useEffect(() => {
+        if (!user?.token || !realtimeEvent) return;
+        const shouldRefresh = ["role_changed", "user_deleted", "permission_changed", "camera_changed"].includes(realtimeEvent.event);
+        if (shouldRefresh) {
+            setLoading(true);
+            fetch(`${apiBase}/api/systemControl/allUsers`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${user.token}`,
+                },
+            })
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success) setUsers(result.data);
+                })
+                .catch(() => setError("เกิดข้อผิดพลาดในการเชื่อมต่อ"))
+                .finally(() => setLoading(false));
+        }
+    }, [realtimeEvent, user?.token]);
 
     const filtered = useMemo(() => {
         return users.filter(u => {
@@ -248,84 +274,6 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
 
     return (
         <>
-            <style>{`
-                .ul-wrap { width: 100%; display: flex; flex-direction: column; gap: 0; font-family: inherit; }
-
-                /* User card */
-                .ul-card { background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 14px; transition: border-color 0.15s, background 0.15s; }
-                .ul-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); }
-                .ul-card.is-banned { opacity: 0.6; }
-                .ul-avatar-img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #3b82f6; flex-shrink: 0; }
-                .ul-avatar { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 14px; border: 2px solid rgba(255,255,255,0.1); }
-                .ul-info { flex: 1; min-width: 0; }
-                .ul-username { font-size: 15px; font-weight: 500; color: #f1f5f9; margin-bottom: 4px; }
-                .ul-card.is-banned .ul-username { text-decoration: line-through; color: #64748b; }
-                .ul-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-                .ul-uid { font-size: 12px; color: #475569; font-family: ui-monospace, monospace; }
-                .ul-date { font-size: 11px; color: #334155; }
-
-                /* Badges */
-                .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.02em; }
-                .badge-admin { background: #EEEDFE; color: #3C3489; }
-                .badge-user { background: #E1F5EE; color: #085041; }
-                .badge-banned { background: #FCEBEB; color: #791F1F; }
-
-                /* Actions */
-                .ul-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-                .ul-divider { width: 1px; height: 18px; background: rgba(255,255,255,0.08); margin: 0 2px; }
-                .ul-btn { width: 32px; height: 32px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.08); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; transition: all 0.15s; }
-                .ul-btn:hover { border-color: rgba(255,255,255,0.2); color: #f1f5f9; background: rgba(255,255,255,0.07); }
-                .ul-btn.btn-danger:hover { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.4); color: #f87171; }
-                .ul-btn.btn-warn:hover { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.3); color: #fbbf24; }
-                .ul-btn.btn-unban:hover { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #34d399; }
-                .ul-btn svg { pointer-events: none; }
-
-                /* Empty */
-                .ul-empty { text-align: center; padding: 2.5rem 0; color: #475569; font-size: 14px; }
-
-                /* Loading */
-                .ul-loading { padding: 2rem; display: flex; justify-content: center; }
-                .ul-loading p { font-size: 14px; color: #64748b; font-family: ui-monospace, monospace; }
-                .ul-error { color: #f87171; }
-
-                /* Modal */
-                .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
-                .modal-box { background: #1e2433; border: 0.5px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 24px; width: 100%; max-width: 360px; position: relative; }
-                .modal-title { font-size: 16px; font-weight: 500; color: #f1f5f9; margin-bottom: 10px; }
-                .modal-message { font-size: 14px; color: #94a3b8; line-height: 1.6; margin-bottom: 20px; }
-                .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
-                .btn-cancel { height: 36px; padding: 0 16px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.12); background: transparent; color: #94a3b8; font-size: 14px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-                .btn-cancel:hover { background: rgba(255,255,255,0.05); color: #f1f5f9; }
-                .btn-confirm { height: 36px; padding: 0 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-                .confirm-danger { background: #7f1d1d; color: #fca5a5; }
-                .confirm-danger:hover { background: #991b1b; }
-                .confirm-warn { background: #78350f; color: #fde68a; }
-                .confirm-warn:hover { background: #92400e; }
-                .confirm-info { background: #1e3a5f; color: #93c5fd; }
-                .confirm-info:hover { background: #1e40af; }
-                .confirm-success { background: #064e3b; color: #6ee7b7; }
-                .confirm-success:hover { background: #065f46; }
-                .modal-close-btn { position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.15s; }
-                .modal-close-btn:hover { color: #f1f5f9; }
-
-                /* Profile modal */
-                .profile-modal { max-width: 320px; }
-                .profile-header { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
-                .profile-avatar-img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #3b82f6; flex-shrink: 0; }
-                .profile-avatar-placeholder { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 500; flex-shrink: 0; }
-                .profile-username { font-size: 16px; font-weight: 500; color: #f1f5f9; margin-bottom: 5px; }
-                .profile-rows { border-top: 0.5px solid rgba(255,255,255,0.08); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
-                .profile-row { display: flex; justify-content: space-between; align-items: center; }
-                .profile-row-label { font-size: 12px; color: #475569; }
-                .profile-row-value { font-size: 13px; color: #94a3b8; font-family: ui-monospace, monospace; }
-
-                /* Toast */
-                .ul-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e2433; border: 0.5px solid rgba(255,255,255,0.15); border-radius: 999px; padding: 10px 20px; font-size: 13px; color: #f1f5f9; z-index: 200; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3); animation: fadeUp 0.2s ease; }
-                .ul-toast.toast-error { border-color: rgba(239,68,68,0.3); color: #fca5a5; }
-                .ul-toast.toast-warn { border-color: rgba(234,179,8,0.3); color: #fde68a; }
-                @keyframes fadeUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-            `}</style>
-
             <div className="ul-wrap">
                 <div className="lg:hidden">
                     {/* Stats */}

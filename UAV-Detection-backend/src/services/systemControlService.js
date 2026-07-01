@@ -1,6 +1,7 @@
 import express from "express";  
 import { doQuery } from "../database/mysqlConnection.js";
 import { protect } from "../middlewares/authMiddleware.js";
+import { broadcastSystemUpdate, invalidateUserSession } from "../../socket.js";
 
 const systemControlRouter = express.Router();
 
@@ -20,6 +21,8 @@ systemControlRouter.patch("/changeRole/:userId", protect, async (req, res) => {
     try {
         const result = await doQuery(`UPDATE users SET role = "${req.body.role}" WHERE user_id = ${req.params.userId}`);
         if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `User ID ${req.params.userId} not found.`});
+        broadcastSystemUpdate("role_changed", { userId: req.params.userId, role: req.body.role, changedBy: req.user?.user_id || null });
+        invalidateUserSession(req.params.userId, "Your account permissions were updated. Please sign in again.");
         res.status(200).json({ success: true, message: `Changed user's role with ID ${req.params.userId} to ${req.body.role}`});
     } catch (error) {
         console.log(`Error change role for user id ${req.params.userId}: `, error);
@@ -32,6 +35,8 @@ systemControlRouter.delete("/deleteUser/:userId", protect, async (req, res) => {
     try {
         const result = await doQuery(`UPDATE users SET deleted = 1 WHERE user_id = ${req.params.userId}`);
         if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `User ID ${req.params.userId} not found.`});
+        broadcastSystemUpdate("user_deleted", { userId: req.params.userId });
+        invalidateUserSession(req.params.userId, "Your account was removed. Please sign in again.");
         res.status(204).send();
     } catch (error) {
         console.log(`Error delete for user id ${req.params.userId}: `, error);

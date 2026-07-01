@@ -68,6 +68,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
     };
 
     return (
+        
         <div className="w-full h-full flex flex-col text-white bg-slate-800/30">
             {/* Header */}
             <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm sticky top-0 z-10 shadow-md">

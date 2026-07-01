@@ -1,6 +1,6 @@
 // Map.jsx
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
-import { useWebSocket } from '../context/websocketContext';
+import { Map, Satellite } from 'lucide-react';
 
 // --- 1. Custom Hook: แยก Logic การโหลด Script ---
 const useLeafletLoader = () => {
@@ -102,12 +102,16 @@ const createBasePopupContent = (base) => `
 const MapControls = memo(({ mapType, setMapType, onReset }) => {
     return (
         <>
-            <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg z-[400] overflow-hidden flex flex-col sm:flex-row">
-                <button onClick={() => setMapType('street')} className={`px-4 py-2 text-sm font-medium transition-colors ${mapType === 'street' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}>🗺️ แผนที่</button>
-                <button onClick={() => setMapType('satellite')} className={`px-4 py-2 text-sm font-medium transition-colors border-t sm:border-t-0 sm:border-l ${mapType === 'satellite' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}>🛰️ ดาวเทียม</button>
+            <div className="absolute top-4 right-4 rounded-full max-sm:rounded-lg border border-slate-700 bg-slate-900/90 backdrop-blur-lg shadow-[0_20px_40px_rgba(15,23,42,0.25)] z-[400] overflow-hidden flex gap-1 p-1 max-sm:p-0 max-sm:block ">
+                <button onClick={() => setMapType('street')} className={`flex max-sm:w-full max-sm:rounded-none items-center gap-2 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] transition-all duration-200 rounded-full ${mapType === 'street' ? 'bg-slate-700/95 text-slate-100 ring-1 ring-slate-500 max-sm:ring-0' : 'bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-slate-100'}`}>
+                    <Map className="w-4 h-4" /> แผนที่
+                </button>
+                <button onClick={() => setMapType('satellite')} className={`flex max-sm:w-full max-sm:rounded-none items-center gap-2 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] transition-all duration-200 rounded-full ${mapType === 'satellite' ? 'bg-slate-700/95 text-slate-100 ring-1 ring-slate-500 max-sm:ring-0' : 'bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-slate-100'}`}>
+                    <Satellite className="w-4 h-4" /> ดาวเทียม
+                </button>
             </div>
-            <button onClick={onReset} className="absolute bottom-8 right-14 bg-white p-3 rounded-full shadow-lg z-[400] hover:bg-gray-100 transition-all active:scale-95 text-gray-700 border border-gray-400" title="กลับไปที่ฐานตรวจการณ์">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line><circle cx="12" cy="12" r="3"></circle></svg>
+            <button onClick={onReset} className="absolute bottom-8 right-14 grid place-items-center w-12 h-12 rounded-full bg-slate-900/90 border border-slate-700 text-slate-200 shadow-[0_16px_30px_rgba(15,23,42,0.2)] z-[400] hover:bg-slate-800 transition-all duration-200 active:scale-95" title="กลับไปที่ฐานตรวจการณ์">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
         </>
     );
@@ -141,7 +145,7 @@ const createSectorPoints = (lat, lng, radius, heading, status, fov = 65) => {
 };
 
 // --- Main Component ---
-export function Map({ base, selectedCamera, detectingCameras }) {
+export function BoboMap({ base, selectedCamera, detectingCameras }) {
     const mapContainerRef = useRef(null);
     const mapInstance = useRef(null);
     const markersRef = useRef({});
@@ -269,147 +273,6 @@ export function Map({ base, selectedCamera, detectingCameras }) {
 
     return (
         <div className="w-full h-full flex flex-col bg-gray-900 overflow-hidden border border-slate-700">
-            <style>{`
-                .leaflet-popup-content-wrapper {
-                    background: rgba(15, 23, 42, 0.9) !important;
-                    color: #f8fafc !important;
-                    border: 1px solid rgba(51, 65, 85, 0.5);
-                    backdrop-filter: blur(8px);
-                    border-radius: 8px !important;
-                    padding: 0;
-                    box-shadow: 0 0 20px rgba(0,0,0,0.5) !important;
-                }
-                .leaflet-popup-tip { background: rgba(15, 23, 42, 0.9) !important; }
-                .leaflet-popup-content { margin: 0 !important; width: auto !important; }
-
-                /* Tactical Popup Style */
-                .tactical-popup { padding: 12px; min-width: 180px; }
-                .popup-header { display: flex; flex-direction: column; margin-bottom: 8px; padding-left: 10px; }
-                .status-row { font-size: 12px; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 4px; }
-                .coord-row { display: flex; gap: 8px; font-family: monospace; }
-                .coord { font-size: 10px; color: #cbd5e1; }
-                .coord span { color: #64748b; margin-right: 4px; }
-
-                .radar-pulse {
-                    position: absolute;
-                    width: 24px; height: 24px;
-                    border: 2px solid;
-                    border-radius: 50%;
-                    animation: radar-ping 2s infinite ease-out;
-                    opacity: 0;
-                }
-                .delay-1 { animation-delay: 0.5s; }
-
-                @keyframes radar-ping {
-                    0% { transform: scale(1); opacity: 0.8; }
-                    100% { transform: scale(3); opacity: 0; }
-                }
-
-                /* Threat Pulse Ring - Expanded concentric circles */
-                .threat-pulse-ring {
-                    position: absolute;
-                    top: 15px;
-                    left: 20px;
-                    width: 30px;
-                    height: 30px;
-                    margin-top: -15px;
-                    margin-left: -15px;
-                    border: 2px solid #FF4444;
-                    border-radius: 50%;
-                    animation: threat-ring-expand 1.5s ease-out infinite;
-                    opacity: 0.8;
-                    pointer-events: none;
-                    box-shadow: 0 0 20px #FF4444;
-                }
-
-                @keyframes threat-ring-expand {
-                    0% { 
-                        transform: scale(0.8);
-                        opacity: 0.8;
-                        box-shadow: 0 0 20px #FF4444;
-                    }
-                    50% {
-                        box-shadow: 0 0 40px #FF4444;
-                    }
-                    100% { 
-                        transform: scale(3);
-                        opacity: 0;
-                        box-shadow: 0 0 60px #FF4444;
-                    }
-                }
-
-                @keyframes threat-box-pulse {
-                    0%, 100% { 
-                        box-shadow: 0 0 15px #FF4444;
-                    }
-                    50% { 
-                        box-shadow: 0 0 30px #FF4444, 0 0 50px rgba(255, 68, 68, 0.5);
-                    }
-                }
-
-                /* Base Marker Style */
-                .base-marker-container {
-                position: relative;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                }
-
-                /* ตัวกล่องไอคอนทรงเหลี่ยมตัดมุม (Tactical Look) */
-                .base-tactical-box {
-                    width: 30px;
-                    height: 30px;
-                    border: 2px solid white;
-                    border-radius: 6px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 5;
-                    transform: rotate(-45deg);
-                    transition: all 0.3s ease;
-                }
-
-                .base-tactical-box svg {
-                    transform: rotate(45deg);
-                    filter: drop-shadow(0 0 2px rgba(0,0,0,0.5));
-                }
-
-                /* ป้ายชื่อด้านล่าง */
-                .base-label-tag {
-                    margin-top: 4px;
-                    font-size: 9px;
-                    font-weight: 900;
-                    padding: 1px 6px;
-                    border-radius: 4px;
-                    border: 1px solid white;
-                    white-space: nowrap;
-                    letter-spacing: 0.5px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-                }
-
-                /* เอฟเฟกต์วงแหวนสัญญาณขยายตัว */
-                .base-signal-ring {
-                    position: absolute;
-                    top: 15px;
-                    left: 20px;
-                    width: 30px;
-                    height: 30px;
-                    margin-top: -15px;
-                    margin-left: -15px;
-                    border: 2px solid #22DD5D;
-                    border-radius: 50%;
-                    animation: base-signal-expand 3s infinite;
-                    opacity: 0;
-                    pointer-events: none;
-                }
-
-                @keyframes base-signal-expand {
-                    0% { transform: scale(0.5); opacity: 0; }
-                    50% { opacity: 0.5; }
-                    100% { transform: scale(2.5); opacity: 0; }
-                }
-            `}</style>
 
             <div className="flex-1 flex relative">
                 <div ref={mapContainerRef} className="w-full h-full" />
@@ -431,4 +294,4 @@ export function Map({ base, selectedCamera, detectingCameras }) {
     );
 }
 
-export default Map;
+export default BoboMap;

@@ -1,7 +1,6 @@
-// Dashboard.jsx
 import { useEffect, useRef, useState, useMemo } from "react";
 import Topbar from "../components/Topbar.jsx";
-import Map from "../components/Map.jsx";
+import BoboMap from "../components/BoboMap.jsx";
 import { Camera, Clock, Video, MapPin, Compass, ShieldCheck, Activity } from "lucide-react"
 import StreamViewer from "../components/StreamViwer.jsx";
 import Situation from "../components/Situation.jsx";
@@ -33,7 +32,7 @@ const cameraStatusColors = {
 };
 
 export default function Dashboard() {
-  const { lastMessage, connected } = useWebSocket();
+  const { lastMessage, connected, realtimeEvent } = useWebSocket();
 
   const [cameraID, setCameraID] = useState('None');
   const [sideTab, setSideTab] = useState('situation');
@@ -45,7 +44,6 @@ export default function Dashboard() {
   const [basePosition, setBasePosition] = useState([]);
   const [cameraList, setCameraList] = useState([]);
 
-  // const [newHistory, setNewHistory] = useState(false);
   const [events, setEvents] = useState([]);
   const [isEventFetching, setIsEventFetching] = useState(true);
 
@@ -83,18 +81,10 @@ export default function Dashboard() {
   const unReadEvents = events ? events.filter(e => e.seen === 0) : [];
   const readEvents = events ? events.filter(e => e.seen === 1) : [];
 
-  // useEffect(() => {
-  //   if (unReadEvents.length > 0) {
-  //     setNewHistory(true);
-  //   } else {
-  //     setNewHistory(false);
-  //   }
-  // }, [unReadEvents]);
-
   const permissionMap = useMemo(() => {
     const map = {};
-    if (permissions && permissions.data && Array.isArray(permissions.data)) {
-      permissions.data.forEach(perm => {
+    if (permissions && Array.isArray(permissions)) {
+      permissions.forEach(perm => {
         map[perm.camera_id] = perm.permission_level;
       });
     }
@@ -117,12 +107,12 @@ export default function Dashboard() {
       }
     };
     fetchCameras();
-  }, [connected]);
+  }, [connected, realtimeEvent]);
 
   useEffect(() => {
     if (lastMessage) {
       const detecting = lastMessage.detectingCameras || [];
-
+      
       // Check if new threat detected
       if (detecting.length > prevDetectingCount && detecting.length > 0) {
         const newThreats = detecting.slice(prevDetectingCount);
@@ -199,57 +189,6 @@ export default function Dashboard() {
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{
-        __html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-
-        .parent-container {overflow: hidden;}
-        .parent-container::-webkit-scrollbar { width: 0px; height: 0px; }
-        .parent-container::-webkit-scrollbar-track { background: transparent; }
-        .parent-container::-webkit-scrollbar-thumb { background: transparent; }
-
-        @keyframes slideInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes slideOutDown {
-          from {
-            opacity: 1;
-            transform: translateY(0);
-          }
-          to {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-        }
-
-        .toast-notification {
-          animation: slideInUp 0.3s ease-out;
-        }
-
-        .toast-notification.exit {
-          animation: slideOutDown 0.3s ease-in;
-        }
-
-        @keyframes threat-pulse-badge {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-
-        .threat-badge-pulse {
-          animation: threat-pulse-badge 1s ease-in-out infinite;
-        }
-      `}} />
-
       {/* Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-[10000] space-y-3 pointer-events-none">
         {toasts.map(toast => (
@@ -298,7 +237,11 @@ export default function Dashboard() {
             transition-all duration-300 ease-in-out
             ${rightTabOn ? 'w-[calc(100%-400px)]' : 'w-full'}
           `}>
-            <Map base={basePosition} selectedCamera={cameraID} detectingCameras={detectingCameras} />
+            <BoboMap
+              base={basePosition}
+              selectedCamera={cameraID}
+              detectingCameras={detectingCameras}
+            />
             <div
               ref={cameraContainerRef}
               style={{

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Camera, Plus, Pencil, Users, X, MapPin } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useWebSocket } from "../context/WebsocketContext";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
@@ -247,6 +248,7 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
 
 export default function CameraList() {
     const { user } = useAuth();
+    const { realtimeEvent } = useWebSocket();
     const [cameras, setCameras] = useState([]);
     const [allUsers, setAllUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -299,7 +301,33 @@ export default function CameraList() {
 
         fetchAllCamera();
         fetchAllUsers();
-    }, []);
+    }, [user?.token]);
+
+    useEffect(() => {
+        if (!realtimeEvent) return;
+        const shouldRefresh = ["camera_changed", "permission_changed"].includes(realtimeEvent.event);
+        if (!shouldRefresh) return;
+
+        setLoading(true);
+        fetch(`${apiBase}/api/camera/getAllCameras`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) setCameras(data.data);
+            })
+            .catch(() => setError("เกิดข้อผิดพลาดในการเชื่อมต่อ"))
+            .finally(() => setLoading(false));
+
+        if (user?.token) {
+            fetch(`${apiBase}/api/systemControl/allUsers`, {
+                headers: authHeaders,
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) setAllUsers(data.data);
+                })
+                .catch(() => {});
+        }
+    }, [realtimeEvent]);
 
     useEffect(() => {
         if (!assignModal) return;
@@ -395,90 +423,6 @@ export default function CameraList() {
 
     return (
         <>
-            <style>{`
-                .cl-wrap { width: 100%; display: flex; flex-direction: column; font-family: inherit; }
-
-                .cl-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
-                .cl-header-title { font-size: 13px; color: #64748b; font-family: ui-monospace, monospace; letter-spacing: 0.04em; }
-                .cl-add-btn { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f1f5f9; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-                .cl-add-btn:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
-
-                .cl-list { display: flex; flex-direction: column; gap: 8px; }
-                .cl-card { border: 0.5px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 16px; display: flex; width: 100%; align-items: center; gap: 16px; background: rgba(255,255,255,0.03); transition: border-color 0.15s, background 0.15s; }
-                .cl-card:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); }
-                .cl-icon-wrap { position: relative; flex-shrink: 0; }
-                .cl-cam-icon { width: 56px; height: 56px; color: #475569; }
-                .cl-status-pip { position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #1a1f2e; }
-                .pip-active { background: #34d399; }
-                .pip-maintenance { background: #fbbf24; }
-                .pip-inactive { background: #64748b; }
-
-                .cl-info { flex-grow: 1; min-width: 0; }
-                .cl-name { margin-bottom: 4px; color: #f1f5f9; font-weight: 500; font-size: 15px; }
-                .cl-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-                .cl-uid { color: #475569; font-family: ui-monospace, monospace; font-size: 12px; }
-                .cl-coords { display: flex; align-items: center; gap: 4px; color: #475569; font-family: ui-monospace, monospace; font-size: 11px; }
-                .cl-status-text { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
-                .status-active { background: #064e3b; color: #6ee7b7; }
-                .status-maintenance { background: #78350f; color: #fde68a; }
-                .status-inactive { background: rgba(255,255,255,0.06); color: #64748b; }
-
-                .cl-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-                .cl-btn { width: 36px; height: 36px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.08); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b; transition: all 0.15s; }
-                .cl-btn:hover { border-color: rgba(255,255,255,0.2); color: #f1f5f9; background: rgba(255,255,255,0.07); }
-
-                .cl-empty { text-align: center; padding: 2.5rem 0; color: #475569; font-size: 14px; }
-                .cl-loading { padding: 2rem; display: flex; justify-content: center; }
-                .cl-loading p { font-size: 14px; color: #64748b; font-family: ui-monospace, monospace; }
-                .cl-error { color: #f87171; }
-
-                /* Modal */
-                .cl-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
-                .cl-modal-box { background: #1e2433; border: 0.5px solid rgba(255,255,255,0.12); border-radius: 14px; padding: 24px; width: 100%; max-width: 450px; position: relative; }
-                .cl-modal-title { font-size: 16px; font-weight: 500; color: #f1f5f9; margin-bottom: 4px; }
-                .cl-modal-subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 18px; }
-                .cl-modal-close { position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 6px; border: none; background: transparent; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.15s; }
-                .cl-modal-close:hover { color: #f1f5f9; }
-
-                .cl-form-group { margin-bottom: 16px; }
-                .cl-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
-                .cl-form-row .cl-form-group { margin-bottom: 0; }
-                .cl-label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
-                .cl-input { width: 100%; height: 38px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #f1f5f9; font-size: 14px; padding: 0 12px; outline: none; font-family: inherit; transition: border-color 0.15s; }
-                .cl-input:focus { border-color: rgba(255,255,255,0.3); }
-                .cl-input::placeholder { color: #475569; }
-
-                .cl-status-toggle { display: flex; gap: 8px; }
-                .cl-status-btn { flex: 1; height: 38px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.02); color: #94a3b8; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: inherit; transition: all 0.15s; }
-                .cl-status-btn.is-active { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.08); color: #f1f5f9; }
-                .cl-status-dot { width: 8px; height: 8px; border-radius: 50%; }
-                .dot-active { background: #34d399; }
-                .dot-maintenance { background: #fbbf24; }
-                .dot-inactive { background: #64748b; }
-
-                .cl-permission-btn { flex: 1; height: 44px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; padding: 0 12px; }
-                .cl-permission-btn.is-active { border-color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.08); }
-                .cl-permission-hint { font-size: 12px; color: #475569; margin-top: 8px; line-height: 1.5; }
-
-                .badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.02em; }
-                .badge-admin { background: #EEEDFE; color: #3C3489; }
-                .badge-operator { background: #FAEEDA; color: #633806; }
-                .badge-viewer { background: #E1F0FB; color: #0C4A6E; }
-                .badge-unassigned { background: rgba(255,255,255,0.06); color: #64748b; }
-
-                .cl-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
-                .cl-btn-cancel { height: 36px; padding: 0 16px; border-radius: 8px; border: 0.5px solid rgba(255,255,255,0.12); background: transparent; color: #94a3b8; font-size: 14px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
-                .cl-btn-cancel:hover { background: rgba(255,255,255,0.05); color: #f1f5f9; }
-                .cl-btn-save { height: 36px; padding: 0 16px; border-radius: 8px; border: none; background: #2563eb; color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: background 0.15s; }
-                .cl-btn-save:hover { background: #1d4ed8; }
-                .cl-btn-save:disabled { background: rgba(255,255,255,0.06); color: #475569; cursor: not-allowed; }
-
-                /* Toast */
-                .cl-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e2433; border: 0.5px solid rgba(255,255,255,0.15); border-radius: 999px; padding: 10px 20px; font-size: 13px; color: #f1f5f9; z-index: 200; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.3); animation: clFadeUp 0.2s ease; }
-                .cl-toast.toast-error { border-color: rgba(239,68,68,0.3); color: #fca5a5; }
-                @keyframes clFadeUp { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
-            `}</style>
-
             <div className="cl-wrap">
                 <div className="cl-header">
                     <span className="cl-header-title">กล้องทั้งหมด ({cameras.length})</span>

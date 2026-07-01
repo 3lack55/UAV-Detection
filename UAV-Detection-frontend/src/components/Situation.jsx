@@ -46,6 +46,10 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
     return (
         <div className="w-full h-full flex flex-col bg-slate-800/50 text-slate-100 shadow-xl">
             <style>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+
                 @keyframes threat-shake {
                     0%, 100% { transform: translateX(0) rotate(0deg); }
                     10% { transform: translateX(-2px) rotate(-0.5deg); }
@@ -96,7 +100,8 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
             {/* List Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                 {cameras.map((camera) => {
-                    const isDetecting = detectingCameras.some(dc => dc.cameraId === camera.camera_id);
+                    const cameraId = String(camera.camera_id ?? camera.id ?? camera.cameraId);
+                    const isDetecting = detectingCameras.some(dc => String(dc.cameraId) === cameraId);
                     const statusKey = isDetecting ? 'threat' : camera.status || 'inactive';
                     const status = STATUS_CONFIG[statusKey];
                     const hasPermission = permissionMap[camera.camera_id] || false;
@@ -116,7 +121,7 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                             <div className={`absolute left-0 top-0 bottom-0 w-1 ${status.color.replace('text', 'bg')}`} />
 
                             <div className="flex justify-between items-start relative z-10">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 w-[60%]">
                                     <div className={`p-1.5 rounded-lg bg-slate-900/50 ${status.color} ${isDetecting ? 'animate-pulse' : ''}`}>
                                         <Camera className="w-6 h-6" />
                                     </div>
@@ -125,7 +130,8 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                                         <p className="text-xs text-slate-400">ID: {camera.camera_id}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+
+                                <div className="flex justify-end items-center gap-2 w-[40%]">
                                     {!hasPermission && (
                                         <Lock className="w-4 h-4 text-yellow-400" title="No permission to view this camera" />
                                     )}
@@ -139,8 +145,8 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                                         {status.label}
                                     </div>
                                 </div>
-
                             </div>
+
                             <div className="mt-3 text-xs text-slate-400 flex justify-between items-center gap-1 italic bg-slate-900/30 p-2 rounded-md border border-white/5 relative z-10">
                                 <span>Lat: {parseFloat(camera.latitude).toFixed(6)}</span>
                                 <span>Lng: {parseFloat(camera.longitude).toFixed(6)}</span>

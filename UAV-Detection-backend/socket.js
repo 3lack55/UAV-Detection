@@ -1,6 +1,7 @@
 import { WebSocketServer } from "ws";
 import dotenv from 'dotenv';
 import jwt from 'jsonwebtoken';
+import { doQuery } from "./src/database/mysqlConnection.js";
 
 dotenv.config();
 
@@ -28,10 +29,6 @@ function getOrCreateSession(cameraId) {
         cameraSessions.set(cameraId, {
             viewers: new Set(),
             sender: null,
-            stats: {
-                framesRelayed: 0,
-                bytesRelayed: 0
-            },
             lastUnpacked: 0
         });
         console.log(`📦 Created session: ${cameraId}`);
@@ -74,15 +71,9 @@ function broadcastToViewers(cameraId, data, isBinary) {
     const session = cameraSessions.get(cameraId);
     if (!session || session.viewers.size === 0) return;
 
-    // อัปเดตสถิติ
-    session.stats.framesRelayed++;
-    session.stats.bytesRelayed += isBinary ? data.byteLength : data.length;
-
     // วนลูปส่งให้คนดูทุกคน
     for (const client of session.viewers) {
         if (client.readyState === 1) { // 1 = OPEN
-            // เช็ค Backpressure: ถ้าเน็ตคนดูช้ามาก (Buffer เต็ม) ให้ข้ามเฟรมนี้ไปเลย (Drop Frame)
-            // ป้องกัน Server ความจำเต็ม
             if (client.bufferedAmount > 256 * 1024) { // ถ้าค้างเกิน 256KB
                 continue;
             }
@@ -129,6 +120,58 @@ function broadcastToClients() {
             }
         }
     }
+}
+
+export function broadcastSystemUpdate(event, data = {}) {
+    const payload = {
+        type: 'system_update',
+        event,
+        data: {
+            ...data,
+            timestamp: new Date().toISOString()
+        }
+    };
+
+    for (const [ws] of clientSessions.entries()) {
+        if (ws.readyState === 1) {
+            try {
+                ws.send(JSON.stringify(payload));
+            } catch (e) {
+                console.error(`Broadcast system update error: ${e.message}`);
+            }
+        }
+    }
+}
+
+export function invalidateUserSession(userId, reason = 'Your session has been invalidated.') {
+    const targetSessions = [];
+    for (const [ws, userData] of clientSessions.entries()) {
+        if (String(userData.userId) === String(userId)) {
+            targetSessions.push(ws);
+        }
+    }
+
+    targetSessions.forEach((ws) => {
+        clientSessions.delete(ws);
+        try {
+            ws.send(JSON.stringify({
+                type: 'auth_required',
+                success: false,
+                reason,
+                timestamp: new Date().toISOString()
+            }));
+        } catch (e) {
+            console.error(`Failed to notify session invalidation: ${e.message}`);
+        }
+
+        try {
+            ws.close(4005, reason);
+        } catch (e) {
+            console.error(`Failed to close invalidated session: ${e.message}`);
+        }
+    });
+
+    broadcastToClients();
 }
 
 async function createEvent(cameraId, start) {
@@ -186,7 +229,7 @@ async function endEvent(cameraId) {
         }
         
         events.delete(cameraId);
-        broadcastToClients(); // Broadcast when event ends
+        broadcastToClients();
     } catch (error) {
         console.error("Failed to end event session:", error);
     }
@@ -234,6 +277,29 @@ async function checkEventTimeouts() {
     }
 }
 
+async function updateCameraStatus(cameraId, status) {
+    const patch_url = `${getApiUrl()}/api/camera/updateStatus/${cameraId}`;
+    
+    try {
+        const response = await fetch(patch_url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        console.log(`Camera ${cameraId} status updated to ${status}.`);
+        return true;
+    } catch (error) {
+        console.error(`Failed to update camera ${cameraId} status:`, error);
+        return false;
+    }
+}
+
 setInterval(() => checkEventTimeouts(), 3000);
 
 async function uavEventHandler(data) {
@@ -256,7 +322,6 @@ async function uavEventHandler(data) {
             events.set(cameraId, { lastActivity: Date.now(), eventId: eventId });
             await writeEventData(eventId, cameraId, data);
             
-            // Broadcast when new event detected
             broadcastToClients();
         } else {
             let eventData = events.get(cameraId);
@@ -276,8 +341,8 @@ async function uavEventHandler(data) {
 export function initializeWebSocket(server) {
     const wss = new WebSocketServer({
         server,
-        perMessageDeflate: false, // ปิดการบีบอัดเพื่อลด Latency
-        maxPayload: 5 * 1024 * 1024 // รับไฟล์ใหญ่สุด 5MB
+        perMessageDeflate: false,
+        maxPayload: 5 * 1024 * 1024 
     });
 
     console.log('WebSocket Stream Server is running.');
@@ -330,36 +395,115 @@ export function initializeWebSocket(server) {
 
         } else if (role.startsWith('camera')) {
             // --- กรณีเป็น Sender (Camera/Python) ---
-            const cameraId = role; // สมมติว่า url คือ /camera1 เลย
-            console.log(`📷 Camera connected: ${cameraId}`);
+            let isAuthenticated = false;
+            let cameraId = null;
+            let authTimeout = null;
 
-            const session = getOrCreateSession(cameraId);
-            session.sender = ws;
+            ws.once('message', async (message) => {
+                try {
+                    const data = JSON.parse(message);
+                    if (data.type === 'auth' && data.token) {
+                        try {
+                            const decoded = jwt.verify(data.token, JWT_SECRET);
+                            cameraId = decoded.camera_id;
+
+                            if (!cameraId) {
+                                console.warn("Camera connection rejected: No camera_id in token.");
+                                if (authTimeout) clearTimeout(authTimeout);
+                                ws.close(4004, "Unauthorized: No camera_id in token");
+                                return;
+                            }
+
+                            const cameraExists = await doQuery("SELECT camera_id FROM cameras WHERE camera_id = ?", [cameraId]);
+                            if (cameraExists.length === 0) {
+                                console.warn(`Camera connection rejected: Camera ${cameraId} not found in database.`);
+                                if (authTimeout) clearTimeout(authTimeout);
+                                ws.close(4005, "Unauthorized: Camera not found");
+                                return;
+                            }
+
+                            const statusUpdated = await updateCameraStatus(cameraId, 'active');
+                            if (!statusUpdated) {
+                                console.error(`Rejected camera ${cameraId}. Failed to update status.`);
+                                if (authTimeout) clearTimeout(authTimeout);
+                                ws.close(4006, "Failed to update camera status");
+                                return;
+                            }
+
+                            isAuthenticated = true;
+                            console.log(`Camera connected and authenticated: camera${cameraId}`);
+                            
+                            const session = getOrCreateSession(`camera${cameraId}`);
+                            session.sender = ws;
+                            
+                            if (authTimeout) clearTimeout(authTimeout);
+                            
+                            ws.send(JSON.stringify({ type: 'auth_response', success: true, cameraId }));
+                            
+                        } catch (err) {
+                            console.warn("Camera connection rejected: Invalid token.");
+                            if (authTimeout) clearTimeout(authTimeout);
+                            ws.close(4002, "Unauthorized: Invalid token");
+                            return;
+                        }
+                    } else {
+                        console.warn("Camera connection rejected: No token provided.");
+                        if (authTimeout) clearTimeout(authTimeout);
+                        ws.close(4001, "Unauthorized: No token provided");
+                        return;
+                    }
+                } catch (err) {
+                    console.warn("Camera connection error:", err.message);
+                    if (authTimeout) clearTimeout(authTimeout);
+                    ws.close(4000, "Bad message format");
+                    return;
+                }
+            });
+
+            // กำหนด timeout สำหรับการยืนยันตัวตน
+            authTimeout = setTimeout(() => {
+                if (!isAuthenticated) {
+                    console.warn("Camera connection timeout: No auth message received");
+                    ws.close(4003, "Authentication timeout");
+                }
+            }, 5000);
 
             ws.on('message', (message, isBinary) => {
-                broadcastToViewers(cameraId, message, isBinary);
+                if (!isAuthenticated) return;
+
+                broadcastToViewers(`camera${cameraId}`, message, isBinary);
+
+                const session = cameraSessions.get(`camera${cameraId}`);
+                if (!session) return;
 
                 if (session.lastUnpacked && (Date.now() - session.lastUnpacked < 3000)) {
                     return;
                 }
                 let unpacked = unpackage(message);
-                session.lastUnpacked = Date.now();
-
-                // console.log(`Received from camera${cameraId}:`, unpacked?.meta || "No metadata");   
+                session.lastUnpacked = Date.now();  
 
                 if (unpacked && unpacked.meta && unpacked.meta.uavs && unpacked.meta.uavs.length > 0) {
                     uavEventHandler(unpacked);
                 }
             });
 
-            ws.on('close', () => {
-                console.log(`Camera disconnected: ${cameraId}`);
-                const s = cameraSessions.get(cameraId);
-                if (s) s.sender = null;
-                console.log(`Total Camera Sessions: ${cameraSessions.size} | Total WebSocket Clients: ${wss.clients.size}`);
+            ws.on('close', async () => {
+                if (isAuthenticated && cameraId) {
+                    console.log(`Camera disconnected: camera${cameraId}`);
+                    const s = cameraSessions.get(`camera${cameraId}`);
+                    if (s) s.sender = null;
+                    await updateCameraStatus(cameraId, 'inactive');
+                    console.log(`Total Camera Sessions: ${cameraSessions.size} | Total WebSocket Clients: ${wss.clients.size}`);
+                } else {
+                    console.log("Unauthenticated camera connection closed");
+                    if (authTimeout) clearTimeout(authTimeout);
+                }
             });
 
-            ws.on('error', (e) => console.error(`Camera error: ${e.message}`));
+            ws.on('error', (e) => {
+                if (authTimeout) clearTimeout(authTimeout);
+                console.error(`Camera error: ${e.message}`);
+            });
         } else if (role.startsWith("client")) {
             let isAuthenticated = false;
             let clientData = null;
@@ -454,14 +598,4 @@ export function initializeWebSocket(server) {
     wss.on('close', () => {
         console.log("WebSocket server closed.");
     });
-
-    // (Optional) Loop แสดง Stat ทุก 10 วินาที
-    // setInterval(() => {
-    //     cameraSessions.forEach((session, id) => {
-    //         if (session.stats.framesRelayed > 0) {
-    //             console.log(`📊 [${id}] Relayed: ${session.stats.framesRelayed} frames, Viewers: ${session.viewers.size}`);
-    //             session.stats.framesRelayed = 0; // Reset counter
-    //         }
-    //     });
-    // }, 10000);
 }
