@@ -11,7 +11,7 @@ const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
 export function CameraPermissionProvider({ children }) {
     const [permissions, setPermissions] = useState([]);
     const { user } = useAuth();
-    const { realtimeEvent } = useWebSocket();
+    const { systemEvent } = useWebSocket();
     const [loading, setLoading] = useState(true); 
 
     useEffect(() => {
@@ -37,10 +37,10 @@ export function CameraPermissionProvider({ children }) {
     }, [user?.user_id, user?.token]);
 
     useEffect(() => {
-        if (!user || !realtimeEvent) return;
-        const shouldRefresh = ["permission_changed", "camera_changed", "role_changed"].includes(realtimeEvent.event);
+        if (!user || !systemEvent) return;
+        const shouldRefresh = ["permission_changed", "camera_changed", "role_changed"].includes(systemEvent.event);
         if (shouldRefresh) {
-            const targetUser = realtimeEvent.data?.userId;
+            const targetUser = systemEvent.data?.userId;
             if (!targetUser || String(targetUser) === String(user.user_id)) {
                 setLoading(true);
                 fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getCameraPermissionsByUser/${user.user_id}`, {
@@ -52,7 +52,7 @@ export function CameraPermissionProvider({ children }) {
                     .finally(() => setLoading(false));
             }
         }
-    }, [realtimeEvent, user?.user_id, user?.token]);
+    }, [systemEvent, user?.user_id, user?.token]);
 
     return (
         <CameraPermissionContext.Provider value={{ permissions, loading }}>

@@ -145,7 +145,7 @@ const createSectorPoints = (lat, lng, radius, heading, status, fov = 65) => {
 };
 
 // --- Main Component ---
-export function BoboMap({ base, selectedCamera, detectingCameras }) {
+const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }) {
     const mapContainerRef = useRef(null);
     const mapInstance = useRef(null);
     const markersRef = useRef({});
@@ -256,7 +256,7 @@ export function BoboMap({ base, selectedCamera, detectingCameras }) {
         baseLayersRef.current = [];
 
         basePosition.forEach(b => {
-            const status = detectingIds.has(b.id) ? 'threat' : b.status;
+            const status = detectingIds.has(String(b.id)) ? 'threat' : b.status;
             
             const sectorPoints = createSectorPoints(b.lat, b.lng, 100, b.heading, status, 90);
             const fovPolygon = window.L.polygon(sectorPoints, {
@@ -292,6 +292,6 @@ export function BoboMap({ base, selectedCamera, detectingCameras }) {
             </div>
         </div>
     );
-}
+});
 
 export default BoboMap;

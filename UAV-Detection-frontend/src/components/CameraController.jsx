@@ -1,130 +1,296 @@
-import { useState } from 'react';
-import { 
-  Camera, 
-  ChevronUp, ChevronDown, ChevronLeft, ChevronRight, 
+import { useEffect, useState } from 'react';
+import {
+  Camera,
+  ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   Plus, Minus,
-  Lock
+  Lock,
+  AlertCircle,
+  CheckCircle2,
+  LoaderCircle
 } from 'lucide-react';
 
-export function CameraController({ cameraID, permission = "", onControl }) {
-  const [zoom, setZoom] = useState(1);
+export function CameraController({ cameraID, permission = "", onControl, active = false }) {
+  const [controlTypes, setControlTypes] = useState("continuously");
+  const [degree, setDegree] = useState(5);
+  const [degreeInput, setDegreeInput] = useState("5");
+  const [feedback, setFeedback] = useState(null);
+  const [isSending, setIsSending] = useState(false);
 
-  // ตรวจสอบสิทธิ์การควบคุม
   const hasControl = permission === "admin" || permission === "operator";
+  const isReady = hasControl && active;
 
-  const handleCommand = (command) => {
-    if (!hasControl) return;
-    if (typeof onControl === 'function') {
-      onControl(command);
+  const normalizeDegree = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+
+    const rounded = Math.round(parsed / 5) * 5;
+    return Math.min(45, Math.max(5, rounded));
+  };
+
+  const updateDegree = (rawValue) => {
+    setDegreeInput(String(rawValue));
+
+    const normalized = normalizeDegree(rawValue);
+    if (normalized === null) {
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 5–45 องศา' });
+      return;
+    }
+
+    setDegree(normalized);
+    setFeedback(null);
+  };
+
+  const commitDegree = () => {
+    const normalized = normalizeDegree(degreeInput);
+    if (normalized === null) {
+      setDegreeInput(String(degree));
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 5–45 องศา' });
+      return;
+    }
+
+    setDegree(normalized);
+    setDegreeInput(String(normalized));
+    setFeedback(null);
+  };
+
+  const handleCommand = async (command) => {
+    if (!hasControl) {
+      setFeedback({ type: 'error', message: 'คุณไม่มีสิทธิ์ควบคุมกล้องนี้' });
+      return;
+    }
+
+    if (!active) {
+      setFeedback({ type: 'error', message: 'กล้องยังไม่พร้อมรับคำสั่ง' });
+      return;
+    }
+
+    try {
+      setIsSending(true);
+      setFeedback({ type: 'info', message: 'กำลังส่งคำสั่ง…' });
+
+      if (typeof onControl === 'function') {
+        const result = onControl(command);
+        if (result && typeof result.then === 'function') {
+          await result;
+        }
+      }
+
+      setFeedback({ type: 'success', message: 'ส่งคำสั่งเรียบร้อยแล้ว' });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error?.message || 'ส่งคำสั่งไม่สำเร็จ กรุณาลองใหม่'
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
-  // สไตล์ปุ่มกดทิศทาง
-  const ControlBtn = ({ children, className = "", onClick }) => (
-    <button 
+  const ControlBtn = ({ children, className = '', onClick }) => (
+    <button
       type="button"
       onClick={onClick}
-      disabled={!hasControl}
-      className={`p-3 bg-slate-700/50 transition-all rounded-lg border border-slate-600 shadow-inner 
-        ${hasControl ? 'hover:bg-blue-600/50 active:scale-90 cursor-pointer' : 'opacity-40 cursor-not-allowed'} 
+      disabled={!isReady || isSending}
+      className={`p-3 bg-slate-700/50 transition-all rounded-lg border border-slate-600 shadow-inner
+        ${!isReady ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-600/50 active:scale-90 cursor-pointer'}
         ${className}`}
     >
       {children}
     </button>
   );
 
+  const feedbackStyles = {
+    success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+    error: 'bg-red-500/10 border-red-500/30 text-red-300',
+    info: 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+  };
+
+  const feedbackIcon = {
+    success: <CheckCircle2 className="w-3.5 h-3.5" />,
+    error: <AlertCircle className="w-3.5 h-3.5" />,
+    info: <LoaderCircle className="w-3.5 h-3.5 animate-spin" />
+  };
+
+  useEffect(() => {
+    if (!feedback || feedback.type !== 'success') {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setFeedback(null);
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
+
   return (
     <div className="w-full h-full flex flex-col bg-slate-900/80 text-slate-100 shadow-2xl border border-slate-700/50 backdrop-blur-md">
-      {/* Header */}
       <div className="w-full h-[47px] p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
         <div className="flex items-center gap-2">
           <Camera className="w-5 h-5 text-blue-400" />
           <h2 className="font-bold text-sm tracking-widest uppercase text-slate-300">CAM-{cameraID}</h2>
         </div>
-        
-        {/* Badge สิทธิ์การใช้งาน */}
+
         <div className="flex gap-2">
-          {hasControl ? (
-            <span className="text-[10px] font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
-               CONTROL ACTIVE
-            </span>
+          {active ? (
+            hasControl ? (
+              <span className="text-[10px] font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+                CONTROL ACTIVE
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono bg-red-500/10 px-2 py-1 rounded border border-red-500/30 text-red-400 flex items-center gap-1">
+                <Lock className="w-3 h-3" /> UNAUTHORIZED
+              </span>
+            )
           ) : (
-            <span className="text-[10px] font-mono bg-red-500/10 px-2 py-1 rounded border border-red-500/30 text-red-400 flex items-center gap-1">
-              <Lock className="w-3 h-3" /> UNAUTHORIZED
+            <span className="text-[10px] font-mono bg-slate-500/10 px-2 py-1 rounded border border-slate-500/30 text-slate-400 flex items-center gap-1">
+              <Lock className="w-3 h-3" /> INACTIVE
             </span>
           )}
         </div>
       </div>
 
-      {/* ส่วนควบคุมหลัก (ใส่ Relative เพื่อทำ Overlay) */}
-      <div className="flex relative p-2 overflow-y-auto custom-scrollbar items-center justify-center w-full h-full">
-        
-        {/* === Locked Overlay === */}
-        {!hasControl && (
+      <div className="flex items-center justify-center relative overflow-y-auto custom-scrollbar flex-1">
+        {!isReady ? (
           <div className="absolute inset-0 z-20 bg-slate-900/40 backdrop-blur-[2px] flex flex-col items-center justify-center transition-all duration-500">
             <div className="bg-slate-800/90 border border-slate-700 p-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2 scale-110">
-                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
-                    <Lock className="w-5 h-5 text-red-500" />
-                </div>
-                <div className="text-center">
-                    <p className="text-[11px] font-bold text-white uppercase tracking-widest">Controls Locked</p>
-                    <p className="text-[9px] text-slate-400">Insufficient Permission Level</p>
-                </div>
+              <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                <Lock className="w-5 h-5 text-red-500" />
+              </div>
+              <div className="text-center">
+                <p className="text-[11px] font-bold text-white uppercase tracking-widest">
+                  {active ? 'Controls Locked' : 'Camera Unavailable'}
+                </p>
+                <p className="text-[9px] text-slate-400">
+                  {active ? 'สิทธิ์การควบคุมไม่เพียงพอ' : 'กล้องยังไม่พร้อมรับคำสั่ง'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-4 py-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">โหมด: </span>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setControlTypes('continuously')}
+                className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] transition ${controlTypes === 'continuously' ? 'bg-slate-600 text-white' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'}`}
+              >
+                ต่อเนื่อง
+              </button>
+              <button
+                type="button"
+                onClick={() => setControlTypes('absolutely')}
+                className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] transition ${controlTypes === 'absolutely' ? 'bg-slate-600 text-white' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'}`}
+              >
+                กำหนดมุม
+              </button>
             </div>
           </div>
         )}
 
-        {/* ส่วนควบคุมทิศทาง (PTZ) */}
-        <div className={`flex flex-col items-center justify-center space-y-4 transition-opacity duration-300 ${!hasControl ? 'opacity-30' : 'opacity-100'}`}>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Directional Control</p>
-          <div className="grid grid-cols-3 gap-2">
-            <div />
-            <ControlBtn onClick={() => handleCommand('up')}><ChevronUp className="w-4 h-4" /></ControlBtn>
-            <div />
-            <ControlBtn onClick={() => handleCommand('left')}><ChevronLeft className="w-4 h-4" /></ControlBtn>
-            <div className="bg-slate-800 rounded-full border border-slate-700 flex items-center justify-center">
-                <div className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${hasControl ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`} />
+        {controlTypes === 'continuously' && (
+          <div className="w-full px-4 flex flex-col items-center justify-between gap-6">
+            <div className="w-full flex items-center justify-between p-2">
+              <span className="text-sm text-slate-400">องศาต่อการกด</span>
+              <div className="flex gap-1 items-center justify-center">
+                <button
+                  type="button"
+                  onClick={() => updateDegree(degree - 5)}
+                  disabled={!isReady || isSending}
+                  className="disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Minus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                </button>
+                <input
+                  type="text"
+                  min="5"
+                  max="45"
+                  step="5"
+                  value={degree}
+                  onChange={(event) => updateDegree(event.target.value)}
+                  onBlur={commitDegree}
+                  onKeyDown={(event) => event.key === 'Enter' && commitDegree()}
+                  disabled={!isReady || isSending}
+                  className="bg-slate-800 text-slate-400 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 w-16 text-center rounded-md"
+                />
+                <button
+                  type="button"
+                  onClick={() => updateDegree(degree + 5)}
+                  disabled={!isReady || isSending}
+                  className="disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                </button>
+              </div>
             </div>
-            <ControlBtn onClick={() => handleCommand('right')}><ChevronRight className="w-4 h-4" /></ControlBtn>
-            <div />
-            <ControlBtn onClick={() => handleCommand('down')}><ChevronDown className="w-4 h-4" /></ControlBtn>
-            <div />
+
+            <div className="flex items-center justify-center w-full h-full gap-4">
+              <div className={`transition-opacity duration-300 ${!isReady ? 'opacity-30' : 'opacity-100'}`}>
+                <div className="grid grid-cols-3 gap-2">
+                  <div />
+                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'up', deg: degree })}>
+                    <ChevronUp className="w-4 h-4" />
+                  </ControlBtn>
+                  <div />
+                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'left', deg: degree })}>
+                    <ChevronLeft className="w-4 h-4" />
+                  </ControlBtn>
+                  <div className="bg-slate-800 rounded-full border border-slate-700 flex items-center justify-center">
+                    <div className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${isReady ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`} />
+                  </div>
+                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'right', deg: degree })}>
+                    <ChevronRight className="w-4 h-4" />
+                  </ControlBtn>
+                  <div />
+                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'down', deg: degree })}>
+                    <ChevronDown className="w-4 h-4" />
+                  </ControlBtn>
+                  <div />
+                </div>
+              </div>
+            </div>
           </div>
+        )}
+
+        {controlTypes === 'absolutely' && (
+          <div className="flex items-center justify-center w-full h-full gap-4 mt-2">
+            <div className={`transition-opacity duration-300 ${!isReady ? 'opacity-30' : 'opacity-100'}`}>
+              <div className="grid grid-cols-5 grid-rows-5 gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                <div className={`col-start-3 border-slate-600 row-start-3 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'reset', pan: 0, tilt: 0 })}>รีเซ็ต</div>
+                <div className={`col-start-2 border-slate-600 row-start-3 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left45', pan: -45, tilt: 0 })}>L45°</div>
+                <div className={`col-start-1 border-slate-600 row-start-3 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left90', pan: -90, tilt: 0 })}>L90°</div>
+                <div className={`col-start-4 border-slate-600 row-start-3 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right45', pan: 45, tilt: 0 })}>R45°</div>
+                <div className={`col-start-5 border-slate-600 row-start-3 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right90', pan: 90, tilt: 0 })}>R90°</div>
+                <div className={`col-start-3 border-slate-600 row-start-2 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'up15', pan: 0, tilt: -15 })}>T15°</div>
+                <div className={`col-start-3 border-slate-600 row-start-1 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'up45', pan: 0, tilt: -45 })}>T45°</div>
+                <div className={`col-start-3 border-slate-600 row-start-4 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'down15', pan: 0, tilt: 15 })}>B15°</div>
+                <div className={`col-start-3 border-slate-600 row-start-5 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'down45', pan: 0, tilt: 45 })}>B45°</div>
+                <div className={`col-start-2 border-slate-600 row-start-2 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left45-top15', pan: -45, tilt: -15 })}>L45° T15°</div>
+                <div className={`col-start-1 border-slate-600 row-start-1 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left90-top45', pan: -90, tilt: -45 })}>L90° T45°</div>
+                <div className={`col-start-4 border-slate-600 row-start-2 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right45-top15', pan: 45, tilt: -15 })}>R45° T15°</div>
+                <div className={`col-start-5 border-slate-600 row-start-1 border rounded-md flex justify-center items-center p_2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not_allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right90-top45', pan: 90, tilt: -45 })}>R90° T45°</div>
+                <div className={`col-start-2 border-slate-600 row-start-4 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left45-bottom15', pan: -45, tilt: 15 })}>L45° B15°</div>
+                <div className={`col-start-1 border-slate-600 row-start-5 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left90-bottom45', pan: -90, tilt: 45 })}>L90° B45°</div>
+                <div className={`col-start-4 border-slate-600 row-start-4 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right45-bottom15', pan: 45, tilt: 15 })}>R45° B15°</div>
+                <div className={`col-start-5 border-slate-600 row-start-5 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right90-bottom45', pan: 90, tilt: 45 })}>R90° B45°</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="absolute bottom-0 w-full flex items-center justify-between p-1 z-10">
+          <span className="text-xs text-slate-400">ทิศทาง: </span>
+          <span className="text-xs text-slate-400">ระนาบ: </span>
+          <span className="text-xs text-slate-400">ก้มเงย: </span>
         </div>
 
-        {/* ส่วนควบคุม Zoom */}
-        {/* <div className={`flex flex-col justify-center space-y-6 transition-opacity duration-300 ${!hasControl ? 'opacity-30' : 'opacity-100'}`}>
-          <div className="space-y-2">
-            <div className="flex justify-between text-[10px] text-slate-500 font-bold">
-              <span>ZOOM LEVEL</span>
-              <span className="text-blue-400 font-mono">{zoom.toFixed(1)}x</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <button 
-                disabled={!hasControl}
-                onClick={() => setZoom(Math.max(1, zoom - 1))} 
-                className="p-1 hover:text-blue-400 disabled:text-slate-700"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <input 
-                type="range" 
-                min="1" max="4" step="0.1" 
-                value={zoom} 
-                disabled={!hasControl}
-                onChange={(e) => setZoom(parseFloat(e.target.value))}
-                className={`w-full h-1 rounded-lg appearance-none cursor-pointer accent-blue-500 bg-slate-700 ${!hasControl && 'cursor-not-allowed opacity-50'}`} 
-              />
-              <button 
-                disabled={!hasControl}
-                onClick={() => setZoom(Math.min(4, zoom + 1))} 
-                className="p-1 hover:text-blue-400 disabled:text-slate-700"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
+        {feedback && (
+          <div className={`absolute top-1 right-1 z-30 flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-medium shadow-lg ${feedbackStyles[feedback.type] || feedbackStyles.info}`}>
+            {feedbackIcon[feedback.type] || feedbackIcon.info}
+            <span>{feedback.message}</span>
           </div>
-        </div> */}
+        )}
       </div>
     </div>
   );

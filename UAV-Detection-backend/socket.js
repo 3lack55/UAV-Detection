@@ -12,7 +12,6 @@ const events = new Map();
 const eventTimeout = 0.5 * 60 * 1000; // 0.5 นาที
 
 const JWT_SECRET = process.env.JWT_SECRET || 'default_secret';
-const HEARTBEAT_INTERVAL = process.env.HEARTBEAT_INTERVAL || 30000; // 30 วินาที
 
 function heartbeat() {
     this.isAlive = true;
@@ -29,9 +28,10 @@ function getOrCreateSession(cameraId) {
         cameraSessions.set(cameraId, {
             viewers: new Set(),
             sender: null,
-            lastUnpacked: 0
+            lastUnpacked: 0,
+            currentController: null
         });
-        console.log(`📦 Created session: ${cameraId}`);
+        console.log(`Created session: ${cameraId}`);
     }
     return cameraSessions.get(cameraId);
 }
@@ -71,7 +71,6 @@ function broadcastToViewers(cameraId, data, isBinary) {
     const session = cameraSessions.get(cameraId);
     if (!session || session.viewers.size === 0) return;
 
-    // วนลูปส่งให้คนดูทุกคน
     for (const client of session.viewers) {
         if (client.readyState === 1) { // 1 = OPEN
             if (client.bufferedAmount > 256 * 1024) { // ถ้าค้างเกิน 256KB
@@ -103,11 +102,19 @@ function broadcastToClients() {
         });
     }
 
+    const onControlCameras = [];
+    for (const [cameraId, session] of cameraSessions.entries()) {
+        if (session.currentController) {
+            onControlCameras.push({ cameraId, controller: session.currentController });
+        }
+    }
+
     const payload = {
         type: 'status_update',
         data: {
             detectingCameras: detectingCameras,
-            onlineUsers: onlineUsers
+            onlineUsers: onlineUsers,
+            onControlCameras: onControlCameras
         }
     }
 
@@ -509,7 +516,6 @@ export function initializeWebSocket(server) {
             let clientData = null;
             let authTimeout = null;
 
-            // Wait for authentication message from client instead of checking URL params
             ws.once('message', (message) => {
                 try {
                     const data = JSON.parse(message);

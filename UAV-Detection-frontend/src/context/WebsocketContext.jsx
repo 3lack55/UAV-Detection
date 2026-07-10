@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
@@ -14,19 +14,18 @@ export function WebSocketProvider({ children }) {
     const isInitializedRef = useRef(false);
     const { user, logout } = useAuth();
     const [connected, setConnected] = useState(false);
-    const [lastMessage, setLastMessage] = useState(null);
+    const [statusUpdate, setStatusUpdate] = useState(null);
     const [realtimeEvent, setRealtimeEvent] = useState(null);
+    const [systemEvent, setSystemEvent] = useState(null);
     const [reconnecting, setReconnecting] = useState(false);
 
     const RECONNECT_INTERVAL = 5000; // 5 seconds
 
     const connectWebSocket = (token) => {
-        // Don't create a new connection if one already exists
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             return;
         }
 
-        // Connect without token in URL
         const ws = new WebSocket(`${PROTOCOL}://${HOST}:${HOST_PORT}/client`);
         socketRef.current = ws;
 
@@ -45,7 +44,6 @@ export function WebSocketProvider({ children }) {
                         console.log("Client WebSocket authenticated");
                         setConnected(true);
                         setReconnecting(false);
-                        // Clear any pending reconnect attempts when connected
                         if (reconnectIntervalRef.current) {
                             clearInterval(reconnectIntervalRef.current);
                             reconnectIntervalRef.current = null;
@@ -58,6 +56,7 @@ export function WebSocketProvider({ children }) {
                 }
                 
                 if (parsedData.type === 'system_update') {
+                    setSystemEvent(parsedData);
                     setRealtimeEvent(parsedData);
                     return;
                 }
@@ -71,7 +70,7 @@ export function WebSocketProvider({ children }) {
                 } 
 
                 if (parsedData.type === 'status_update') {
-                    setLastMessage(parsedData.data);
+                    setStatusUpdate(parsedData.data);
                     return;
                 }
             } catch (error) {
@@ -144,17 +143,26 @@ export function WebSocketProvider({ children }) {
         };
     }, [user?.token]);
 
-    const sendMessage = (data) => {
+    const sendMessage = useCallback((data) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             const payload = typeof data === 'object' ? JSON.stringify(data) : data;
             socketRef.current.send(payload);
         } else {
             console.warn("Cannot send message: WebSocket is not connected.");
         }
-    };
+    }, []);
+
+    const contextValue = useMemo(() => ({
+        connected,
+        statusUpdate,
+        realtimeEvent,
+        systemEvent,
+        sendMessage,
+        reconnecting,
+    }), [connected, statusUpdate, realtimeEvent, systemEvent, sendMessage, reconnecting]);
 
     return (
-        <WebSocketContext.Provider value={{ connected, lastMessage, realtimeEvent, sendMessage, reconnecting }}>
+        <WebSocketContext.Provider value={contextValue}>
             {children}
         </WebSocketContext.Provider>
     );

@@ -12,7 +12,7 @@ const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
 const MAX_VISIBLE_AVATARS = 3;
 
 function Topbar() {
-    const { connected, reconnecting, lastMessage } = useWebSocket();
+    const { connected, reconnecting, statusUpdate } = useWebSocket();
     const [showConnected, setShowConnected] = useState(connected);
     const [onlineUsers, setOnlineUsers] = useState(null);
     const [showAllUsers, setShowAllUsers] = useState(false);
@@ -48,12 +48,12 @@ function Topbar() {
             const data = await response.json();
             setOnlineUsers(data.data);
         };
-        if (lastMessage && lastMessage.onlineUsers !== undefined && lastMessage.onlineUsers.length !== 0) {
-            const users = lastMessage.onlineUsers;
+        if (statusUpdate && statusUpdate.onlineUsers !== undefined && statusUpdate.onlineUsers.length !== 0) {
+            const users = statusUpdate.onlineUsers;
             const query = "SELECT * FROM users WHERE user_id IN (" + users.map((u) => u.userId).join(',') + ")";
             fetchOnlineUsers(query);
         }
-    }, [lastMessage]);
+    }, [statusUpdate]);
 
     // ปิด dropdown เมื่อคลิกข้างนอก
     useEffect(() => {

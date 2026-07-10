@@ -88,7 +88,7 @@ function ProfileModal({ user: targetUser, open, onClose, apiBase, token }) {
 
 export default function UserList({ search, setSearch, roleFilter, setRoleFilter, onStatsUpdate }) {
     const { user } = useAuth();
-    const { realtimeEvent } = useWebSocket();
+    const { systemEvent } = useWebSocket();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -130,8 +130,8 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
     }, [user?.token]);
 
     useEffect(() => {
-        if (!user?.token || !realtimeEvent) return;
-        const shouldRefresh = ["role_changed", "user_deleted", "permission_changed", "camera_changed"].includes(realtimeEvent.event);
+        if (!user?.token || !systemEvent) return;
+        const shouldRefresh = ["role_changed", "user_deleted", "permission_changed", "camera_changed"].includes(systemEvent.event);
         if (shouldRefresh) {
             setLoading(true);
             fetch(`${apiBase}/api/systemControl/allUsers`, {
@@ -148,7 +148,7 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                 .catch(() => setError("เกิดข้อผิดพลาดในการเชื่อมต่อ"))
                 .finally(() => setLoading(false));
         }
-    }, [realtimeEvent, user?.token]);
+    }, [systemEvent, user?.token]);
 
     const filtered = useMemo(() => {
         return users.filter(u => {

@@ -151,8 +151,6 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
         return perm?.permission_level || null;
     };
 
-    console.log("All Permissions:", allPermissions);
-
     return (
         <div className="cl-modal-overlay" onClick={onClose}>
             <div className="cl-modal-box" onClick={e => e.stopPropagation()}>
@@ -248,7 +246,7 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
 
 export default function CameraList() {
     const { user } = useAuth();
-    const { realtimeEvent } = useWebSocket();
+    const { systemEvent } = useWebSocket();
     const [cameras, setCameras] = useState([]);
     const [allUsers, setAllUsers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -304,8 +302,8 @@ export default function CameraList() {
     }, [user?.token]);
 
     useEffect(() => {
-        if (!realtimeEvent) return;
-        const shouldRefresh = ["camera_changed", "permission_changed"].includes(realtimeEvent.event);
+        if (!systemEvent) return;
+        const shouldRefresh = ["camera_changed", "permission_changed"].includes(systemEvent.event);
         if (!shouldRefresh) return;
 
         setLoading(true);
@@ -327,7 +325,7 @@ export default function CameraList() {
                 })
                 .catch(() => {});
         }
-    }, [realtimeEvent]);
+    }, [systemEvent]);
 
     useEffect(() => {
         if (!assignModal) return;

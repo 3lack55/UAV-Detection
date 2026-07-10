@@ -32,7 +32,7 @@ const cameraStatusColors = {
 };
 
 export default function Dashboard() {
-  const { lastMessage, connected, realtimeEvent } = useWebSocket();
+  const { statusUpdate, connected, realtimeEvent } = useWebSocket();
 
   const [cameraID, setCameraID] = useState('None');
   const [sideTab, setSideTab] = useState('situation');
@@ -93,6 +93,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!connected) return;
+    if (realtimeEvent && realtimeEvent.event !== "camera_changed") return;
 
     const fetchCameras = async () => {
       try {
@@ -107,35 +108,47 @@ export default function Dashboard() {
       }
     };
     fetchCameras();
-  }, [connected, realtimeEvent]);
+  }, [connected, realtimeEvent?.event, realtimeEvent?.data?.timestamp]);
 
   useEffect(() => {
-    if (lastMessage) {
-      const detecting = lastMessage.detectingCameras || [];
-      
-      // Check if new threat detected
-      if (detecting.length > prevDetectingCount && detecting.length > 0) {
-        const newThreats = detecting.slice(prevDetectingCount);
-        newThreats.forEach(threat => {
-          const threatCam = cameraList.find(cam => cam.camera_id === threat.cameraId);
-          const toastId = Date.now();
-          setToasts(prev => [...prev, {
-            id: toastId,
-            message: `มีการตรวจพบ UAV ที่ ${threatCam?.camera_name || 'Camera ' + threat.cameraId}!`,
-            type: 'threat'
-          }]);
+    if (!statusUpdate) return;
 
-          // Auto remove toast after 5 seconds
-          setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== toastId));
-          }, 5000);
-        });
-      }
+    const detecting = statusUpdate.detectingCameras || [];
+    const normalizedDetecting = detecting.map(item => (
+      typeof item === 'object' && item !== null ? { ...item } : item
+    ));
 
-      setPrevDetectingCount(detecting.length);
-      setDetectingCameras(detecting);
+    const hasDetectingChanged = normalizedDetecting.length !== detectingCameras.length ||
+      normalizedDetecting.some((item, index) => {
+        const currentItem = detectingCameras[index];
+        const nextId = typeof item === 'object' && item !== null ? item.cameraId : item;
+        const currentId = typeof currentItem === 'object' && currentItem !== null ? currentItem.cameraId : currentItem;
+        return String(nextId) !== String(currentId);
+      });
+
+    if (detecting.length > prevDetectingCount && detecting.length > 0) {
+      const newThreats = detecting.slice(prevDetectingCount);
+      newThreats.forEach(threat => {
+        const threatCam = cameraList.find(cam => cam.camera_id === threat.cameraId);
+        const toastId = Date.now();
+        setToasts(prev => [...prev, {
+          id: toastId,
+          message: `มีการตรวจพบ UAV ที่ ${threatCam?.camera_name || 'Camera ' + threat.cameraId}!`,
+          type: 'threat'
+        }]);
+
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== toastId));
+        }, 5000);
+      });
     }
-  }, [lastMessage, cameraList, prevDetectingCount]);
+
+    setPrevDetectingCount(detecting.length);
+
+    if (hasDetectingChanged) {
+      setDetectingCameras(normalizedDetecting);
+    }
+  }, [statusUpdate, cameraList, prevDetectingCount, detectingCameras]);
 
   useEffect(() => {
     if (cameraList.length > 0 && cameraID === 'None') {
@@ -431,15 +444,16 @@ export default function Dashboard() {
             </div>
 
             <div className="w-full h-[calc(100%-48px)]">
-              <div className="w-full h-[60%] overflow-y-hidden border-b border-slate-700">
+              <div className="w-full h-[50%] overflow-y-hidden border-b border-slate-700">
                 {sideTab === 'situation' && <Situation detectingCameras={detectingCameras} cameras={cameraList} permissionMap={permissionMap} handleCameraSelect={handleCameraClick} />}
                 {sideTab === 'history' && <History events={events} setEvents={setEvents} unReadEvents={unReadEvents} readEvents={readEvents} isFetching={isEventFetching} setIsFetching={setIsEventFetching} />}
               </div>
 
-              <div className="w-full h-[40%] overflow-hidden">
+              <div className="w-full h-[50%] overflow-hidden">
                 <CameraController
                   cameraID={cameraID}
                   permission={permissionMap[cameraID]}
+                  active={cameraList.some(cam => cam.camera_id === cameraID && cam.status === 'active')}
                   onControl={(command) => controlSenderRef.current?.(command)}
                 />
               </div>
