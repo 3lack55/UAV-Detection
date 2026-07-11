@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useCallback, useState, memo } from 'react';
 import {
   Camera,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
@@ -8,8 +8,62 @@ import {
   CheckCircle2,
   LoaderCircle
 } from 'lucide-react';
+import { useStreamViewer } from '../context/StreamViwerContext';
 
-export function CameraController({ cameraID, permission = "", onControl, active = false }) {
+const ControlBtn = memo(function ControlBtn({ children, className = '', onClick, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`p-3 bg-slate-700/50 transition-all rounded-lg border border-slate-600 shadow-inner
+        ${disabled ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-600/50 active:scale-90 cursor-pointer'}
+        ${className}`}
+    >
+      {children}
+    </button>
+  );
+});
+
+const HeadingReadout = memo(function HeadingReadout() {
+  const streamViewer = useStreamViewer() || {};
+  const heading = streamViewer.metaData?.heading;
+
+  const handleHeadingUpdate = (type, value) => {
+    if (type === 'pan') {
+      if (value < 0) {
+        return `ซ้าย ${Math.abs(value)}°`;
+      } else if (value > 0) {
+        return `ขวา ${value}°`;
+      } else {
+        return `ตรง 0°`;
+      }
+    } else if (type === 'tilt') {
+      if (value < 0) {
+        return `เงย ${Math.abs(value)}°`;
+      } else if (value > 0) {
+        return `ก้ม ${value}°`;
+      } else {
+        return `ตรง 0°`;
+      }
+    } else if (type === 'installFace') {
+      return `${value}°`;
+    }
+  };
+
+  return (
+    <div className="absolute bottom-0 w-full flex items-center justify-between p-1 z-10">
+      <span className="text-xs text-slate-400">ทิศทาง: {handleHeadingUpdate('installFace', heading?.installFace)}</span>
+      <span className="text-xs text-slate-400">ระนาบ: {handleHeadingUpdate('pan', heading?.currentPan)}</span>
+      <span className="text-xs text-slate-400">ก้มเงย: {handleHeadingUpdate('tilt', heading?.currentTilt)}</span>
+    </div>
+  );
+});
+
+function CameraControllerInner({ cameraID, permission = "", onControl, active = false }) {
+  const streamViewer = useStreamViewer() || {};
+  const cameraControlable = streamViewer.metaData?.controlable ?? false;
+
   const [controlTypes, setControlTypes] = useState("continuously");
   const [degree, setDegree] = useState(5);
   const [degreeInput, setDegreeInput] = useState("5");
@@ -18,42 +72,43 @@ export function CameraController({ cameraID, permission = "", onControl, active 
 
   const hasControl = permission === "admin" || permission === "operator";
   const isReady = hasControl && active;
+  const controlsDisabled = !isReady || isSending;
 
-  const normalizeDegree = (value) => {
+  const normalizeDegree = useCallback((value) => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return null;
 
     const rounded = Math.round(parsed / 5) * 5;
-    return Math.min(45, Math.max(5, rounded));
-  };
+    return Math.min(45, Math.max(0, rounded));
+  }, []);
 
-  const updateDegree = (rawValue) => {
+  const updateDegree = useCallback((rawValue) => {
     setDegreeInput(String(rawValue));
 
     const normalized = normalizeDegree(rawValue);
     if (normalized === null) {
-      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 5–45 องศา' });
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 0–45 องศา' });
       return;
     }
 
     setDegree(normalized);
     setFeedback(null);
-  };
+  }, [normalizeDegree]);
 
-  const commitDegree = () => {
+  const commitDegree = useCallback(() => {
     const normalized = normalizeDegree(degreeInput);
     if (normalized === null) {
       setDegreeInput(String(degree));
-      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 5–45 องศา' });
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 0–45 องศา' });
       return;
     }
 
     setDegree(normalized);
     setDegreeInput(String(normalized));
     setFeedback(null);
-  };
+  }, [normalizeDegree, degreeInput, degree]);
 
-  const handleCommand = async (command) => {
+  const handleCommand = useCallback(async (command) => {
     if (!hasControl) {
       setFeedback({ type: 'error', message: 'คุณไม่มีสิทธิ์ควบคุมกล้องนี้' });
       return;
@@ -84,20 +139,7 @@ export function CameraController({ cameraID, permission = "", onControl, active 
     } finally {
       setIsSending(false);
     }
-  };
-
-  const ControlBtn = ({ children, className = '', onClick }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={!isReady || isSending}
-      className={`p-3 bg-slate-700/50 transition-all rounded-lg border border-slate-600 shadow-inner
-        ${!isReady ? 'opacity-30 cursor-not-allowed' : 'hover:bg-blue-600/50 active:scale-90 cursor-pointer'}
-        ${className}`}
-    >
-      {children}
-    </button>
-  );
+  }, [hasControl, active, onControl]);
 
   const feedbackStyles = {
     success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
@@ -134,9 +176,15 @@ export function CameraController({ cameraID, permission = "", onControl, active 
         <div className="flex gap-2">
           {active ? (
             hasControl ? (
-              <span className="text-[10px] font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
-                CONTROL ACTIVE
-              </span>
+              cameraControlable ? (
+                <span className="text-[10px] font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+                  CONTROL ACTIVE
+                </span>
+              ) : (
+                <span className="text-[10px] font-mono bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/30 text-yellow-400 flex items-center gap-1">
+                  CONTROL INACTIVE
+                </span>
+              )
             ) : (
               <span className="text-[10px] font-mono bg-red-500/10 px-2 py-1 rounded border border-red-500/30 text-red-400 flex items-center gap-1">
                 <Lock className="w-3 h-3" /> UNAUTHORIZED
@@ -162,62 +210,79 @@ export function CameraController({ cameraID, permission = "", onControl, active 
                   {active ? 'Controls Locked' : 'Camera Unavailable'}
                 </p>
                 <p className="text-[9px] text-slate-400">
-                  {active ? 'สิทธิ์การควบคุมไม่เพียงพอ' : 'กล้องยังไม่พร้อมรับคำสั่ง'}
+                  {active ? 'ไม่มีสิทธิ์การควบคุม' : 'กล้องยังไม่พร้อมรับคำสั่ง'}
                 </p>
               </div>
             </div>
           </div>
         ) : (
-          <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-4 py-2">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">โหมด: </span>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => setControlTypes('continuously')}
-                className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] transition ${controlTypes === 'continuously' ? 'bg-slate-600 text-white' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'}`}
-              >
-                ต่อเนื่อง
-              </button>
-              <button
-                type="button"
-                onClick={() => setControlTypes('absolutely')}
-                className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] transition ${controlTypes === 'absolutely' ? 'bg-slate-600 text-white' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'}`}
-              >
-                กำหนดมุม
-              </button>
+          cameraControlable ? (
+            <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-4 py-2">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">โหมด: </span>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => setControlTypes('continuously')}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] transition ${controlTypes === 'continuously' ? 'bg-slate-600 text-white' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  ต่อเนื่อง
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setControlTypes('absolutely')}
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] transition ${controlTypes === 'absolutely' ? 'bg-slate-600 text-white' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'}`}
+                >
+                  กำหนดมุม
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="absolute inset-0 z-20 bg-slate-900/40 backdrop-blur-[2px] flex flex-col items-center justify-center transition-all duration-500">
+              <div className="bg-slate-800/90 border border-slate-700 p-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2 scale-110">
+                <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <Lock className="w-5 h-5 text-red-500" />
+                </div>
+                <div className="text-center">
+                  <p className="text-[11px] font-bold text-white uppercase tracking-widest">
+                    Camera Control Inactive
+                  </p>
+                  <p className="text-[9px] text-slate-400">
+                    กล้องนี้ไม่สามารถควบคุมได้
+                  </p>
+                </div>
+              </div>
+            </div>
+          )
         )}
 
         {controlTypes === 'continuously' && (
-          <div className="w-full px-4 flex flex-col items-center justify-between gap-6">
+          <div className="w-full px-4 flex flex-col items-center justify-between gap-2">
             <div className="w-full flex items-center justify-between p-2">
               <span className="text-sm text-slate-400">องศาต่อการกด</span>
               <div className="flex gap-1 items-center justify-center">
                 <button
                   type="button"
                   onClick={() => updateDegree(degree - 5)}
-                  disabled={!isReady || isSending}
+                  disabled={controlsDisabled}
                   className="disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Minus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
                 </button>
                 <input
                   type="text"
-                  min="5"
+                  min="0"
                   max="45"
-                  step="5"
                   value={degree}
                   onChange={(event) => updateDegree(event.target.value)}
                   onBlur={commitDegree}
                   onKeyDown={(event) => event.key === 'Enter' && commitDegree()}
-                  disabled={!isReady || isSending}
+                  disabled={controlsDisabled}
                   className="bg-slate-800 text-slate-400 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 w-16 text-center rounded-md"
                 />
                 <button
                   type="button"
                   onClick={() => updateDegree(degree + 5)}
-                  disabled={!isReady || isSending}
+                  disabled={controlsDisabled}
                   className="disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Plus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
@@ -229,21 +294,21 @@ export function CameraController({ cameraID, permission = "", onControl, active 
               <div className={`transition-opacity duration-300 ${!isReady ? 'opacity-30' : 'opacity-100'}`}>
                 <div className="grid grid-cols-3 gap-2">
                   <div />
-                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'up', deg: degree })}>
+                  <ControlBtn disabled={controlsDisabled} onClick={() => handleCommand({ controlType: controlTypes, direction: 'up', deg: degree })}>
                     <ChevronUp className="w-4 h-4" />
                   </ControlBtn>
                   <div />
-                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'left', deg: degree })}>
+                  <ControlBtn disabled={controlsDisabled} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left', deg: degree })}>
                     <ChevronLeft className="w-4 h-4" />
                   </ControlBtn>
                   <div className="bg-slate-800 rounded-full border border-slate-700 flex items-center justify-center">
                     <div className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.5)] ${isReady ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`} />
                   </div>
-                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'right', deg: degree })}>
+                  <ControlBtn disabled={controlsDisabled} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right', deg: degree })}>
                     <ChevronRight className="w-4 h-4" />
                   </ControlBtn>
                   <div />
-                  <ControlBtn onClick={() => handleCommand({ controlType: controlTypes, direction: 'down', deg: degree })}>
+                  <ControlBtn disabled={controlsDisabled} onClick={() => handleCommand({ controlType: controlTypes, direction: 'down', deg: degree })}>
                     <ChevronDown className="w-4 h-4" />
                   </ControlBtn>
                   <div />
@@ -269,7 +334,7 @@ export function CameraController({ cameraID, permission = "", onControl, active 
                 <div className={`col-start-2 border-slate-600 row-start-2 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left45-top15', pan: -45, tilt: -15 })}>L45° T15°</div>
                 <div className={`col-start-1 border-slate-600 row-start-1 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left90-top45', pan: -90, tilt: -45 })}>L90° T45°</div>
                 <div className={`col-start-4 border-slate-600 row-start-2 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right45-top15', pan: 45, tilt: -15 })}>R45° T15°</div>
-                <div className={`col-start-5 border-slate-600 row-start-1 border rounded-md flex justify-center items-center p_2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not_allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right90-top45', pan: 90, tilt: -45 })}>R90° T45°</div>
+                <div className={`col-start-5 border-slate-600 row-start-1 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right90-top45', pan: 90, tilt: -45 })}>R90° T45°</div>
                 <div className={`col-start-2 border-slate-600 row-start-4 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left45-bottom15', pan: -45, tilt: 15 })}>L45° B15°</div>
                 <div className={`col-start-1 border-slate-600 row-start-5 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'left90-bottom45', pan: -90, tilt: 45 })}>L90° B45°</div>
                 <div className={`col-start-4 border-slate-600 row-start-4 border rounded-md flex justify-center items-center p-2 ${isReady ? 'cursor-pointer hover:bg-slate-700' : 'cursor-not-allowed'}`} onClick={() => handleCommand({ controlType: controlTypes, direction: 'right45-bottom15', pan: 45, tilt: 15 })}>R45° B15°</div>
@@ -279,11 +344,7 @@ export function CameraController({ cameraID, permission = "", onControl, active 
           </div>
         )}
 
-        <div className="absolute bottom-0 w-full flex items-center justify-between p-1 z-10">
-          <span className="text-xs text-slate-400">ทิศทาง: </span>
-          <span className="text-xs text-slate-400">ระนาบ: </span>
-          <span className="text-xs text-slate-400">ก้มเงย: </span>
-        </div>
+        <HeadingReadout />
 
         {feedback && (
           <div className={`absolute top-1 right-1 z-30 flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-medium shadow-lg ${feedbackStyles[feedback.type] || feedbackStyles.info}`}>
@@ -295,5 +356,7 @@ export function CameraController({ cameraID, permission = "", onControl, active 
     </div>
   );
 }
+
+export const CameraController = memo(CameraControllerInner);
 
 export default CameraController;

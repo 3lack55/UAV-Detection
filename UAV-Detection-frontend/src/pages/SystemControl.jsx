@@ -3,6 +3,8 @@ import { MoveLeft, Settings, Users, Camera, Info } from "lucide-react";
 import UserList from "../components/Userlist";
 import CameraList from "../components/CameraList";
 import { Link } from "react-router-dom";
+import { useWebSocket } from "../context/WebsocketContext";
+import { useCameraPermissions } from "../context/CameraPermissionContext";
 
 export default function SystemControl() {
     const [activeTab, setActiveTab] = useState("users");
@@ -11,6 +13,54 @@ export default function SystemControl() {
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState("all");
     const [stats, setStats] = useState({ total: 0, admin: 0, banned: 0 });
+
+    const { statusUpdate } = useWebSocket();
+    const [detectingCameras, setDetectingCameras] = useState([]);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [showAlert, setShowAlert] = useState(false);
+    const [toasts, setToasts] = useState([]);
+    const [prevDetectingCount, setPrevDetectingCount] = useState(0);
+    const { cameraList } = useCameraPermissions();
+
+    useEffect(() => {
+        if (!statusUpdate) return;
+
+        const detecting = statusUpdate.detectingCameras || [];
+        const normalizedDetecting = detecting.map(item => (
+            typeof item === 'object' && item !== null ? { ...item } : item
+        ));
+
+        const hasDetectingChanged = normalizedDetecting.length !== detectingCameras.length ||
+            normalizedDetecting.some((item, index) => {
+                const currentItem = detectingCameras[index];
+                const nextId = typeof item === 'object' && item !== null ? item.cameraId : item;
+                const currentId = typeof currentItem === 'object' && currentItem !== null ? currentItem.cameraId : currentItem;
+                return String(nextId) !== String(currentId);
+            });
+
+        if (detecting.length > prevDetectingCount && detecting.length > 0) {
+            const newThreats = detecting.slice(prevDetectingCount);
+            newThreats.forEach(threat => {
+                const threatCam = cameraList.find(cam => cam.camera_id === threat.cameraId);
+                const toastId = Date.now();
+                setToasts(prev => [...prev, {
+                    id: toastId,
+                    message: `มีการตรวจพบ UAV ที่ ${threatCam?.camera_name || 'Camera ' + threat.cameraId}!`,
+                    type: 'threat'
+                }]);
+
+                setTimeout(() => {
+                    setToasts(prev => prev.filter(t => t.id !== toastId));
+                }, 5000);
+            });
+        }
+
+        setPrevDetectingCount(detecting.length);
+
+        if (hasDetectingChanged) {
+            setDetectingCameras(normalizedDetecting);
+        }
+    }, [statusUpdate, prevDetectingCount, detectingCameras]);
 
     return (
         <>
@@ -48,6 +98,17 @@ export default function SystemControl() {
                 `
             }} />
 
+            {/* Toast Notifications */}
+            <div className="fixed bottom-4 right-4 z-[10000] space-y-3 pointer-events-none">
+                {toasts.map(toast => (
+                    <div
+                        key={toast.id}
+                        className="toast-notification bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 py-3 rounded-lg shadow-2xl border border-rose-400/50 backdrop-blur-sm pointer-events-auto"
+                    >
+                        <p className="text-sm font-semibold">{toast.message}</p>
+                    </div>
+                ))}
+            </div>
 
             <div className="min-h-full w-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 pt-6 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
                 <div className="mb-6 px-4 lg:mb-0 h-40 flex items-center w-full">

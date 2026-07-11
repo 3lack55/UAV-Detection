@@ -8,11 +8,24 @@ const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
 const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
 
+const cameraPositions = (data) => {
+    return data.map(cam => ({
+        id: cam.camera_id,
+        lat: parseFloat(cam.latitude),
+        lng: parseFloat(cam.longitude),
+        name: cam.camera_name,
+        heading: cam.heading || 0,
+        status: cam.status
+    }));
+};
+
 export function CameraPermissionProvider({ children }) {
     const [permissions, setPermissions] = useState([]);
     const { user } = useAuth();
-    const { systemEvent } = useWebSocket();
-    const [loading, setLoading] = useState(true); 
+    const { systemEvent, connected } = useWebSocket();
+    const [loading, setLoading] = useState(true);
+    const [basePosition, setBasePosition] = useState([]);
+    const [cameraList, setCameraList] = useState([]);
 
     useEffect(() => {
         if (!user) return;
@@ -54,8 +67,27 @@ export function CameraPermissionProvider({ children }) {
         }
     }, [systemEvent, user?.user_id, user?.token]);
 
+    useEffect(() => {
+        if (!connected) return;
+        if (systemEvent && systemEvent.event !== "camera_changed") return;
+
+        const fetchCameras = async () => {
+            try {
+                const response = await fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getAllCameras`);
+                const data = await response.json();
+                if (data.success) {
+                    setCameraList(data.data);
+                    setBasePosition(cameraPositions(data.data));
+                }
+            } catch (err) {
+                console.error("Error fetching cameras:", err);
+            }
+        };
+        fetchCameras();
+    }, [connected, systemEvent?.event, systemEvent?.data?.timestamp]);
+
     return (
-        <CameraPermissionContext.Provider value={{ permissions, loading }}>
+        <CameraPermissionContext.Provider value={{ permissions, loading, basePosition, cameraList }}>
             {children}
         </CameraPermissionContext.Provider>
     );

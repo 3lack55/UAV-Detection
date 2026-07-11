@@ -15,9 +15,90 @@ export function WebSocketProvider({ children }) {
     const { user, logout } = useAuth();
     const [connected, setConnected] = useState(false);
     const [statusUpdate, setStatusUpdate] = useState(null);
-    const [realtimeEvent, setRealtimeEvent] = useState(null);
     const [systemEvent, setSystemEvent] = useState(null);
     const [reconnecting, setReconnecting] = useState(false);
+
+    const audioContextRef = useRef(null);
+    const audioInitializedRef = useRef(false);
+    const prevDetectingCountRef = useRef(0);
+
+    const getAudioContext = useCallback(() => {
+        if (audioContextRef.current) return audioContextRef.current;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return null;
+        audioContextRef.current = new AudioContext();
+        return audioContextRef.current;
+    }, []);
+
+    const resumeAudioContext = useCallback(() => {
+        if (audioInitializedRef.current) return;
+        const audioCtx = getAudioContext();
+        if (!audioCtx) return;
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => { });
+        }
+        audioInitializedRef.current = true;
+    }, [getAudioContext]);
+
+    useEffect(() => {
+        const activateAudio = () => resumeAudioContext();
+        window.addEventListener('click', activateAudio, { once: true, capture: true });
+        window.addEventListener('keydown', activateAudio, { once: true, capture: true });
+        window.addEventListener('touchstart', activateAudio, { once: true, capture: true });
+        return () => {
+            window.removeEventListener('click', activateAudio, { capture: true });
+            window.removeEventListener('keydown', activateAudio, { capture: true });
+            window.removeEventListener('touchstart', activateAudio, { capture: true });
+        };
+    }, [resumeAudioContext]);
+
+    const playDroneAlarm = useCallback(() => {
+        const audioCtx = getAudioContext();
+        if (!audioCtx) return;
+
+        const ensureAudio = audioCtx.state === 'suspended'
+            ? audioCtx.resume()
+            : Promise.resolve();
+
+        ensureAudio.then(() => {
+            const now = audioCtx.currentTime;
+            const duration = 0.8;
+
+            const mainOsc = audioCtx.createOscillator();
+            const subOsc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            mainOsc.type = 'sawtooth';
+            subOsc.type = 'sawtooth';
+
+            mainOsc.frequency.setValueAtTime(600, now);
+            subOsc.frequency.setValueAtTime(610, now);
+
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.05);
+            gainNode.gain.setValueAtTime(0.3, now + duration - 0.1);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            mainOsc.frequency.linearRampToValueAtTime(1000, now + 0.2);
+            subOsc.frequency.linearRampToValueAtTime(1010, now + 0.2);
+            mainOsc.frequency.linearRampToValueAtTime(500, now + 0.4);
+            subOsc.frequency.linearRampToValueAtTime(510, now + 0.4);
+
+            mainOsc.frequency.linearRampToValueAtTime(1200, now + 0.6);
+            subOsc.frequency.linearRampToValueAtTime(1210, now + 0.6);
+            mainOsc.frequency.linearRampToValueAtTime(400, now + duration);
+            subOsc.frequency.linearRampToValueAtTime(410, now + duration);
+
+            mainOsc.connect(gainNode);
+            subOsc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            mainOsc.start(now);
+            subOsc.start(now);
+            mainOsc.stop(now + duration);
+            subOsc.stop(now + duration);
+        }).catch(() => { });
+    }, [getAudioContext]);
 
     const RECONNECT_INTERVAL = 5000; // 5 seconds
 
@@ -37,7 +118,7 @@ export function WebSocketProvider({ children }) {
         ws.onmessage = (event) => {
             try {
                 const parsedData = JSON.parse(event.data);
-                
+
                 // Handle auth response
                 if (parsedData.type === 'auth_response') {
                     if (parsedData.success) {
@@ -54,10 +135,9 @@ export function WebSocketProvider({ children }) {
                     }
                     return;
                 }
-                
+
                 if (parsedData.type === 'system_update') {
                     setSystemEvent(parsedData);
-                    setRealtimeEvent(parsedData);
                     return;
                 }
 
@@ -67,10 +147,20 @@ export function WebSocketProvider({ children }) {
                     setConnected(false);
                     setReconnecting(false);
                     return;
-                } 
+                }
 
                 if (parsedData.type === 'status_update') {
-                    setStatusUpdate(parsedData.data);
+                    const nextStatus = parsedData.data;
+                    const nextDetecting = Array.isArray(nextStatus?.detectingCameras)
+                        ? nextStatus.detectingCameras.length
+                        : 0;
+                    const previousDetecting = prevDetectingCountRef.current ?? 0;
+
+                    if (nextDetecting > previousDetecting) {
+                        playDroneAlarm();
+                    }
+                    prevDetectingCountRef.current = nextDetecting;
+                    setStatusUpdate(nextStatus);
                     return;
                 }
             } catch (error) {
@@ -82,7 +172,7 @@ export function WebSocketProvider({ children }) {
             console.log("Client WebSocket disconnected.");
             setConnected(false);
             setReconnecting(true);
-            
+
             // Schedule reconnect attempts every 5 seconds
             if (shouldReconnectRef.current && token) {
                 if (reconnectIntervalRef.current) {
@@ -152,14 +242,15 @@ export function WebSocketProvider({ children }) {
         }
     }, []);
 
+    // console.log("WebSocketContext Rendered: ");
+
     const contextValue = useMemo(() => ({
         connected,
         statusUpdate,
-        realtimeEvent,
         systemEvent,
         sendMessage,
         reconnecting,
-    }), [connected, statusUpdate, realtimeEvent, systemEvent, sendMessage, reconnecting]);
+    }), [connected, statusUpdate, systemEvent, sendMessage, reconnecting]);
 
     return (
         <WebSocketContext.Provider value={contextValue}>

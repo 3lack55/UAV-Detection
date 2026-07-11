@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { User, Lock, Upload, Eye, EyeOff, Check, X, Loader, Edit2, Save, ShieldAlert, MoveLeft, ImageUp } from "lucide-react";
+import { useWebSocket } from "../context/WebsocketContext";
+import { useCameraPermissions } from "../context/CameraPermissionContext";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
@@ -14,6 +16,14 @@ export default function Account() {
     const [loading, setLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
+
+    const { statusUpdate } = useWebSocket();
+    const [detectingCameras, setDetectingCameras] = useState([]);
+    const [alertMessage, setAlertMessage] = useState('');
+    const [showAlert, setShowAlert] = useState(false);
+    const [toasts, setToasts] = useState([]);
+    const [prevDetectingCount, setPrevDetectingCount] = useState(0);
+    const { cameraList } = useCameraPermissions();
 
     // Profile Form State
     const [profileForm, setProfileForm] = useState({
@@ -265,6 +275,46 @@ export default function Account() {
         }
     };
 
+    useEffect(() => {
+        if (!statusUpdate) return;
+
+        const detecting = statusUpdate.detectingCameras || [];
+        const normalizedDetecting = detecting.map(item => (
+            typeof item === 'object' && item !== null ? { ...item } : item
+        ));
+
+        const hasDetectingChanged = normalizedDetecting.length !== detectingCameras.length ||
+            normalizedDetecting.some((item, index) => {
+                const currentItem = detectingCameras[index];
+                const nextId = typeof item === 'object' && item !== null ? item.cameraId : item;
+                const currentId = typeof currentItem === 'object' && currentItem !== null ? currentItem.cameraId : currentItem;
+                return String(nextId) !== String(currentId);
+            });
+
+        if (detecting.length > prevDetectingCount && detecting.length > 0) {
+            const newThreats = detecting.slice(prevDetectingCount);
+            newThreats.forEach(threat => {
+                const threatCam = cameraList.find(cam => cam.camera_id === threat.cameraId);
+                const toastId = Date.now();
+                setToasts(prev => [...prev, {
+                    id: toastId,
+                    message: `มีการตรวจพบ UAV ที่ ${threatCam?.camera_name || 'Camera ' + threat.cameraId}!`,
+                    type: 'threat'
+                }]);
+
+                setTimeout(() => {
+                    setToasts(prev => prev.filter(t => t.id !== toastId));
+                }, 5000);
+            });
+        }
+
+        setPrevDetectingCount(detecting.length);
+
+        if (hasDetectingChanged) {
+            setDetectingCameras(normalizedDetecting);
+        }
+    }, [statusUpdate, prevDetectingCount, detectingCameras]);
+
     return (
         <>
             <style dangerouslySetInnerHTML={{
@@ -284,6 +334,18 @@ export default function Account() {
                 .right-content-scroll::-webkit-scrollbar-thumb:hover { background: rgb(148 163 184 / 0.7); }
                 `}}
             />
+
+            {/* Toast Notifications */}
+            <div className="fixed bottom-4 right-4 z-[10000] space-y-3 pointer-events-none">
+                {toasts.map(toast => (
+                    <div
+                        key={toast.id}
+                        className="toast-notification bg-gradient-to-r from-rose-600 to-red-600 text-white px-6 py-3 rounded-lg shadow-2xl border border-rose-400/50 backdrop-blur-sm pointer-events-auto"
+                    >
+                        <p className="text-sm font-semibold">{toast.message}</p>
+                    </div>
+                ))}
+            </div>
 
             <div className="min-h-full w-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 px-4 py-6 lg:h-screen lg:overflow-hidden lg:flex lg:flex-col">
                 <div className="mb-6 ">

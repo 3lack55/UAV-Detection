@@ -87,7 +87,7 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
             `}</style>
 
             {/* Header */}
-            <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm sticky top-0 z-10">
+            {/* <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm sticky top-0 z-10">
                 <div className="flex items-center gap-2 w-[55%]">
                     <Activity className="w-5 h-5 text-blue-400" />
                     <h2 className="font-bold text-lg tracking-wide">สถานการณ์ปัจจุบัน</h2>
@@ -95,7 +95,7 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                 <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-mono border border-blue-500/30">
                     DETECTION: {detectingCameras?.length || 0}
                 </span>
-            </div>
+            </div> */}
 
             {/* List Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">

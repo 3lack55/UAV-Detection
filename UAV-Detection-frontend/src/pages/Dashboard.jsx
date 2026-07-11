@@ -3,26 +3,16 @@ import Topbar from "../components/Topbar.jsx";
 import BoboMap from "../components/BoboMap.jsx";
 import { Camera, Clock, Video, MapPin, Compass, ShieldCheck, Activity } from "lucide-react"
 import StreamViewer from "../components/StreamViwer.jsx";
+import { StreamViewerProvider } from "../context/StreamViwerContext.jsx";
 import Situation from "../components/Situation.jsx";
 import History from "../components/History.jsx";
 import CameraController from "../components/CameraController.jsx";
 import { useCameraPermissions } from "../context/CameraPermissionContext.jsx";
-import { useWebSocket } from "../context/websocketContext.jsx";
+import { useWebSocket } from "../context/WebsocketContext.jsx";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
 const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
-
-const cameraPositions = (data) => {
-  return data.map(cam => ({
-    id: cam.camera_id,
-    lat: parseFloat(cam.latitude),
-    lng: parseFloat(cam.longitude),
-    name: cam.camera_name,
-    heading: cam.heading || 0,
-    status: cam.status
-  }));
-};
 
 const cameraStatusColors = {
   active: 'bg-green-500',
@@ -32,7 +22,7 @@ const cameraStatusColors = {
 };
 
 export default function Dashboard() {
-  const { statusUpdate, connected, realtimeEvent } = useWebSocket();
+  const { statusUpdate, connected, systemEvent } = useWebSocket();
 
   const [cameraID, setCameraID] = useState('None');
   const [sideTab, setSideTab] = useState('situation');
@@ -40,9 +30,7 @@ export default function Dashboard() {
   const [leftTabOn, setLeftTabOn] = useState(false);
   const [cameraSize, setCameraSize] = useState({ w: 416, h: 234 });
   const [cameraExpanded, setCameraExpanded] = useState(false);
-  const { permissions } = useCameraPermissions();
-  const [basePosition, setBasePosition] = useState([]);
-  const [cameraList, setCameraList] = useState([]);
+  const { permissions, cameraList, basePosition } = useCameraPermissions();
 
   const [events, setEvents] = useState([]);
   const [isEventFetching, setIsEventFetching] = useState(true);
@@ -90,25 +78,6 @@ export default function Dashboard() {
     }
     return map;
   }, [permissions]);
-
-  useEffect(() => {
-    if (!connected) return;
-    if (realtimeEvent && realtimeEvent.event !== "camera_changed") return;
-
-    const fetchCameras = async () => {
-      try {
-        const response = await fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getAllCameras`);
-        const data = await response.json();
-        if (data.success) {
-          setCameraList(data.data);
-          setBasePosition(cameraPositions(data.data));
-        }
-      } catch (err) {
-        console.error("Error fetching cameras:", err);
-      }
-    };
-    fetchCameras();
-  }, [connected, realtimeEvent?.event, realtimeEvent?.data?.timestamp]);
 
   useEffect(() => {
     if (!statusUpdate) return;
@@ -201,8 +170,9 @@ export default function Dashboard() {
   }
 
   return (
-    <>
-      {/* Toast Notifications */}
+    <StreamViewerProvider cameraID={cameraID}>
+      <>
+        {/* Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-[10000] space-y-3 pointer-events-none">
         {toasts.map(toast => (
           <div
@@ -282,7 +252,6 @@ export default function Dashboard() {
                 className="transition-all duration-300"
               >
                 <StreamViewer
-                  cameraID={cameraID}
                   onControlReady={(sender) => { controlSenderRef.current = sender; }}
                 />
               </div>
@@ -444,12 +413,12 @@ export default function Dashboard() {
             </div>
 
             <div className="w-full h-[calc(100%-48px)]">
-              <div className="w-full h-[50%] overflow-y-hidden border-b border-slate-700">
+              <div className="w-full h-[55%] overflow-y-hidden border-b border-slate-700">
                 {sideTab === 'situation' && <Situation detectingCameras={detectingCameras} cameras={cameraList} permissionMap={permissionMap} handleCameraSelect={handleCameraClick} />}
                 {sideTab === 'history' && <History events={events} setEvents={setEvents} unReadEvents={unReadEvents} readEvents={readEvents} isFetching={isEventFetching} setIsFetching={setIsEventFetching} />}
               </div>
 
-              <div className="w-full h-[50%] overflow-hidden">
+              <div className="w-full h-[45%] overflow-hidden">
                 <CameraController
                   cameraID={cameraID}
                   permission={permissionMap[cameraID]}
@@ -462,5 +431,6 @@ export default function Dashboard() {
         </div>
       </div>
     </>
+    </StreamViewerProvider>
   );
 }

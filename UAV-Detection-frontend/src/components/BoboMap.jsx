@@ -1,13 +1,10 @@
-// Map.jsx
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { Map, Satellite } from 'lucide-react';
 
-// --- 1. Custom Hook: แยก Logic การโหลด Script ---
 const useLeafletLoader = () => {
     const [isLoaded, setIsLoaded] = useState(false);
 
     useEffect(() => {
-        // ถ้าโหลดอยู่แล้ว (เช่น จากหน้าอื่น) ให้ set true เลย
         if (window.L) {
             setIsLoaded(true);
             return;
@@ -33,7 +30,6 @@ const useLeafletLoader = () => {
     return isLoaded;
 };
 
-// --- Constants & Helpers ---
 const COLORS = { active: '#22DD5D', warning: '#FACC15', threat: '#FF4444', inactive: '#6D7280', maintenance: '#F4D03F' };
 const STATUS_TEXT = { active: 'ปกติ', warning: 'เฝ้าระวัง', threat: 'คุกคาม', inactive: 'ไม่ทำงาน', maintenance: 'บำรุงรักษา' };
 
@@ -97,8 +93,6 @@ const createBasePopupContent = (base) => `
     </div>
 `;
 
-// --- 2. Separate Component: ปุ่มควบคุม (ป้องกัน Re-render) ---
-// ใช้ memo เพื่อไม่ให้ render ใหม่เมื่อ uav ขยับ
 const MapControls = memo(({ mapType, setMapType, onReset }) => {
     return (
         <>
@@ -153,7 +147,11 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
 
     // ใช้ Hook ที่เตรียมไว้
     const mapReady = useLeafletLoader();
-    const [mapType, setMapType] = useState('street');
+    const [mapType, setMapType] = useState(() => {
+        if (typeof window === 'undefined') return 'street';
+        const savedType = window.localStorage.getItem('boboMapType');
+        return savedType === 'satellite' ? 'satellite' : 'street';
+    });
     const basePosition = useMemo(() => base.length > 0 ? base : [], [base]);
     const baseLayersRef = useRef([]);
 
@@ -164,8 +162,9 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
         if (!mapReady || !mapContainerRef.current || mapInstance.current) return;
 
         const worldBounds = [[-90, -180], [90, 180]];
+        const initialCenter = basePosition.length > 0 ? [basePosition[0].lat, basePosition[0].lng] : defaultCenter[0];
         const map = window.L.map(mapContainerRef.current, {
-            center: basePosition.length > 0 ? [basePosition[0].lat, basePosition[0].lng] : defaultCenter[0],
+            center: initialCenter,
             zoom: 17, minZoom: 3, maxBounds: worldBounds, maxBoundsViscosity: 1.0, zoomControl: false,
         });
         mapInstance.current = map;
@@ -175,7 +174,11 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
         });
         resizeObserver.observe(mapContainerRef.current);
 
-        const tileLayer = window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        const tileUrl = mapType === 'satellite'
+            ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+            : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+        const tileLayer = window.L.tileLayer(tileUrl, {
             attribution: '&copy; OpenStreetMap contributors', maxZoom: 19, noWrap: true, bounds: worldBounds
         }).addTo(map);
 
@@ -192,7 +195,7 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
             map.remove();
             mapInstance.current = null;
         };
-    }, [mapReady, basePosition]);
+    }, [mapReady]);
 
     useEffect(() => {
         if (!mapInstance.current || !window.L || !mapReady) return;
@@ -215,6 +218,12 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
             baseLayersRef.current.push(fovPolygon, marker);
         });
     }, [basePosition, mapReady]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('boboMapType', mapType);
+        }
+    }, [mapType]);
 
     // Switch Layer
     useEffect(() => {
@@ -277,7 +286,6 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
             <div className="flex-1 flex relative">
                 <div ref={mapContainerRef} className="w-full h-full" />
 
-                {/* --- Control Component (Memoized) --- */}
                 <MapControls
                     mapType={mapType}
                     setMapType={setMapType}

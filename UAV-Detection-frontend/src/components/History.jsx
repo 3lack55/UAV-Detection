@@ -71,7 +71,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
         
         <div className="w-full h-full flex flex-col text-white bg-slate-800/30">
             {/* Header */}
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm sticky top-0 z-10 shadow-md">
+            {/* <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm sticky top-0 z-10 shadow-md">
                 <div className="flex items-center gap-2">
                     <Target className="text-blue-400" size={20} />
                     <h2 className="font-bold text-lg tracking-wide">ประวัติการตรวจพบ</h2>
@@ -82,7 +82,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                         NEW: {unReadEvents.length}
                     </span>
                 )}
-            </div>
+            </div> */}
 
             {/* List Container */}
             <div className='w-full h-full p-4 custom-scrollbar overflow-y-auto flex flex-col gap-3'>
