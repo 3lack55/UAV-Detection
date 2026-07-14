@@ -49,7 +49,7 @@ const createBaseIcon = (label = "CAM", status = "maintenance") => {
                     </svg>
                 </div>
 
-                <div class="base-label-tag" style="background: ${COLORS[status]}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">
+                <div class="base-label-tag" style="background: ${COLORS[status]}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; max-width: 90px; text-align: center;">
                     ${label}
                 </div>
             </div>`,
@@ -61,24 +61,24 @@ const createBaseIcon = (label = "CAM", status = "maintenance") => {
 const createBasePopupContent = (base) => `
     <div class="tactical-popup station-popup">
         <div class="popup-header" style="border-left: 4px solid ${COLORS[base.status]}; padding-left: 10px; margin-bottom: 12px;">
-            <div style="font-size: 10px; color: #94a3b8; letter-spacing: 2px; font-weight: 800; text-transform: uppercase;">
-                Station Profile
+            <div style="font-size: 10px; color: #94a3b8; letter-spacing: 2px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">
+                ${base.type || 'ฐานตรวจการณ์'}
             </div>
             <div style="font-size: 16px; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${COLORS[base.status]}" stroke-width="2.5"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                ${base.name}
+                <h6 style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${base.name}</h6>
             </div>
         </div>
 
         <div class="popup-body" style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
-            <div class="status-row" style="margin-bottom: 8px; font-size: 11px; border-bottom: 1px solid #334155; padding-bottom: 4px;">
-                <span style="color: #64748b;">POSITION:</span>
-                <span style="color: ${COLORS[base.status]}; float: right; font-weight: bold; text-transform: uppercase;">${STATUS_TEXT[base.status]}</span>
+            <div class="status-row" style="margin-bottom: 8px; font-size: 11px; padding-bottom: 2px;">
+                <span style="color: #64748b;">ตำแหน่ง:</span>
             </div>
             
             <div class="coord-row" style="display: flex; justify-content: space-between; font-family: 'monospace'; font-size: 11px;">
                 <div style="color: #cbd5e1;"><span>LAT</span> ${base.lat.toFixed(6)}</div>
-                <div style="color: #cbd5e1; border-left: 1px solid #334155; padding-left: 8px;"><span>LNG</span> ${base.lng.toFixed(6)}</div>
+                <div style="color: #64748b; padding: 0 4px;">|</div>
+                <div style="color: #cbd5e1; "><span>LNG</span> ${base.lng.toFixed(6)}</div>
             </div>
 
             <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
@@ -88,7 +88,7 @@ const createBasePopupContent = (base) => `
         </div>
         
         <div style="margin-top: 8px; font-size: 9px; color: #475569; text-align: center; letter-spacing: 1px;">
-            RADAR SCAN RANGE: 50.0M
+            ${base.last_update ? `อัพเดตล่าสุด: ${new Date(base.last_update).toLocaleString('th-TH')}` : 'ไม่พบข้อมูลอัพเดตล'}
         </div>
     </div>
 `;
@@ -252,7 +252,7 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
         if (targetCamera) {
             mapInstance.current.flyTo([targetCamera.lat, targetCamera.lng], 17, { duration: 0 });
         }
-    }, [selectedCamera, basePosition]);
+    }, [selectedCamera]);
 
     useEffect(() => {
         if (!mapInstance.current || !window.L || !mapReady) return;

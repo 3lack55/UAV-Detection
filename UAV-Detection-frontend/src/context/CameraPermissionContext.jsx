@@ -15,7 +15,8 @@ const cameraPositions = (data) => {
         lng: parseFloat(cam.longitude),
         name: cam.camera_name,
         heading: cam.heading || 0,
-        status: cam.status
+        status: cam.status,
+        last_update: cam.last_update || null,
     }));
 };
 

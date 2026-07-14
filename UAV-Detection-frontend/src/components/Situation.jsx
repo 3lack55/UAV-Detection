@@ -31,15 +31,25 @@ const STATUS_CONFIG = {
     }
 };
 
-const DIRECTION_LABELS = (degree) => {
-    if (degree >= 337.5 || degree < 22.5) return 'North';
-    if (degree >= 22.5 && degree < 67.5) return 'Northeast';
-    if (degree >= 67.5 && degree < 112.5) return 'East';
-    if (degree >= 112.5 && degree < 157.5) return 'Southeast';
-    if (degree >= 157.5 && degree < 202.5) return 'South';
-    if (degree >= 202.5 && degree < 247.5) return 'Southwest';
-    if (degree >= 247.5 && degree < 292.5) return 'West';
-    if (degree >= 292.5 && degree < 337.5) return 'Northwest';
+const getLastOnlineTime = (lastUpdate) => {
+    if (!lastUpdate) return 'ไม่พบข้อมูลอัพเดตล่าสุด';
+    const lastOnlineDate = new Date(lastUpdate);
+    const now = new Date();
+    const diffInMs = now - lastOnlineDate;
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays > 0) {
+        return `${diffInDays} วันที่แล้ว`;
+    }
+    if (diffInHours > 0) {
+        return `${diffInHours} ชั่วโมงที่แล้ว`;
+    }
+    if (diffInMinutes > 0) {
+        return `${diffInMinutes} นาทีที่แล้ว`;
+    }
+    return 'เมื่อสักครู่ก่อน';
 };
 
 export function Situation({ detectingCameras = [], cameras = [], permissionMap = {}, handleCameraSelect }) {
@@ -86,17 +96,6 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                 }
             `}</style>
 
-            {/* Header */}
-            {/* <div className="p-3 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm sticky top-0 z-10">
-                <div className="flex items-center gap-2 w-[55%]">
-                    <Activity className="w-5 h-5 text-blue-400" />
-                    <h2 className="font-bold text-lg tracking-wide">สถานการณ์ปัจจุบัน</h2>
-                </div>
-                <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-mono border border-blue-500/30">
-                    DETECTION: {detectingCameras?.length || 0}
-                </span>
-            </div> */}
-
             {/* List Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                 {cameras.map((camera) => {
@@ -109,7 +108,7 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                     return (
                         <div
                             key={camera.camera_id}
-                            className={`group relative overflow-hidden transition-all duration-300 hover:scale-105 cursor-pointer border ${status.border} ${status.bg} rounded-xl p-4 shadow-lg ${isDetecting ? 'threat-card' : ''}`}
+                            className={`group relative overflow-hidden transition-all duration-75 hover:scale-[101.5%] cursor-pointer border ${status.border} ${status.bg} rounded-xl p-4 shadow-lg ${isDetecting ? 'threat-card' : ''}`}
                             onClick={() => handleCameraSelect(camera.camera_id, hasPermission)}
                         >
                             {/* Threat Glow Background */}
@@ -126,7 +125,7 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                                         <Camera className="w-6 h-6" />
                                     </div>
                                     <div>
-                                        <h3 className="font-semibold text-sm">{camera.camera_name}</h3>
+                                        <h3 className="font-semibold text-sm truncate max-w-48">{camera.camera_name}</h3>
                                         <p className="text-xs text-slate-400">ID: {camera.camera_id}</p>
                                     </div>
                                 </div>
@@ -148,9 +147,29 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                             </div>
 
                             <div className="mt-3 text-xs text-slate-400 flex justify-between items-center gap-1 italic bg-slate-900/30 p-2 rounded-md border border-white/5 relative z-10">
-                                <span>Lat: {parseFloat(camera.latitude).toFixed(6)}</span>
-                                <span>Lng: {parseFloat(camera.longitude).toFixed(6)}</span>
-                                <span>Heading: {DIRECTION_LABELS(parseFloat(camera.heading))}, {parseInt(camera.heading)}°</span>
+                                {statusKey === 'active' && (
+                                    <>
+                                        <span>กล้องนี้ทำงานอยู่ ไม่พบเหตุการณ์ผิดปกติ</span>
+                                    </>
+                                )}
+
+                                {statusKey === 'inactive' && (
+                                    <>
+                                        <span>ทำงานล่าสุด: {getLastOnlineTime(camera.last_update)} ({new Date(camera.last_update).toLocaleString("th-TH")})</span>
+                                    </>
+                                )}
+
+                                {statusKey === 'maintenance' && (
+                                    <>
+                                        <span>อยู่ระหว่างการปรับปรุง ตั้งแต่: ({new Date(camera.last_update).toLocaleString("th-TH")})</span>
+                                    </>
+                                )}
+
+                                {statusKey === 'threat' && (
+                                    <>
+                                        <span>ตรวจพบภัยคุกคาม!</span>
+                                    </>
+                                )}
                             </div>
                         </div>
                     );

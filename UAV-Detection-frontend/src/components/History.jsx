@@ -70,19 +70,6 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
     return (
         
         <div className="w-full h-full flex flex-col text-white bg-slate-800/30">
-            {/* Header */}
-            {/* <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/80 backdrop-blur-sm sticky top-0 z-10 shadow-md">
-                <div className="flex items-center gap-2">
-                    <Target className="text-blue-400" size={20} />
-                    <h2 className="font-bold text-lg tracking-wide">ประวัติการตรวจพบ</h2>
-                </div>
-                {unReadEvents.length > 0 && (
-                    <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-[11px] font-bold font-mono border border-red-500/30 flex items-center gap-1">
-                        <AlertTriangle size={12} />
-                        NEW: {unReadEvents.length}
-                    </span>
-                )}
-            </div> */}
 
             {/* List Container */}
             <div className='w-full h-full p-4 custom-scrollbar overflow-y-auto flex flex-col gap-3'>
@@ -124,7 +111,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                                         </div>
                                     </div>
                                     <span className="text-[10px] font-bold px-2 py-1 bg-red-500/10 text-red-400 rounded-md border border-red-500/20">
-                                        UNREAD
+                                        ยังไม่ได้ดู
                                     </span>
                                 </div>
 
@@ -173,7 +160,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                                         </div>
                                     </div>
                                     <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 bg-slate-800 text-slate-500 rounded-md border border-slate-700">
-                                        <CheckCircle2 size={12} /> CLEARED
+                                        <CheckCircle2 size={12} /> ดูแล้ว
                                     </span>
                                 </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Activity, Wifi, WifiOff, WifiSync } from "lucide-react";
+import { Activity, Wifi, WifiOff, WifiSync, Drone } from "lucide-react";
 import Profile from "./Profile";
 import Clock from "./Clock";
 import { useWebSocket } from "../context/WebsocketContext";
@@ -162,7 +162,7 @@ function Topbar() {
         <>
             <div className="flex items-center justify-between bg-slate-800 pl-6 py-3 border-b border-slate-700 h-full w-full">
                 <div className="flex items-center gap-3">
-                    <Activity className="w-6 h-6 text-blue-400" />
+                    <Drone className="w-6 h-6 text-blue-400 rotate-[30deg]" />
                     <div>
                         <h1 className="text-xl font-bold max-sm:hidden">Bobo's Command Center</h1>
                         <h1 className="text-xl font-bold sm:hidden">Command Center</h1>

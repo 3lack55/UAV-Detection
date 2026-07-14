@@ -119,8 +119,8 @@
 
 /* Tactical Popup Style */
 .tactical-popup {
-  padding: 12px;
-  min-width: 180px;
+  padding: 18px 12px 6px 12px;
+  min-width: 250px;
 }
 
 .popup-header {

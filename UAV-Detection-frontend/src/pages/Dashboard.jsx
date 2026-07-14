@@ -21,6 +21,17 @@ const cameraStatusColors = {
   unknown: 'bg-gray-500'
 };
 
+const DIRECTION_LABELS = (degree) => {
+    if (degree >= 337.5 || degree < 22.5) return 'เหนือ';
+    if (degree >= 22.5 && degree < 67.5) return 'ตะวันออกเฉียงเหนือ';
+    if (degree >= 67.5 && degree < 112.5) return 'ตะวันออก';
+    if (degree >= 112.5 && degree < 157.5) return 'ตะวันตกเฉียงใต้';
+    if (degree >= 157.5 && degree < 202.5) return 'ใต้';
+    if (degree >= 202.5 && degree < 247.5) return 'ตะวันตกเฉียงใต้';
+    if (degree >= 247.5 && degree < 292.5) return 'ตะวันตก';
+    if (degree >= 292.5 && degree < 337.5) return 'ตะวันตกเฉียงเหนือ';
+};
+
 export default function Dashboard() {
   const { statusUpdate, connected, systemEvent } = useWebSocket();
 
@@ -234,9 +245,9 @@ export default function Dashboard() {
               className={`absolute border border-black rounded-lg bottom-4 left-4 z-[1000] overflow-hidden transition-all duration-300 ${leftTabOn ? 'translate-x-[416px]' : 'translate-x-0'}`}
             >
               <div className="w-full h-[32px] flex items-center justify-between gap-2 px-2 bg-slate-800/80 border-b border-black backdrop-blur-[2px]">
-                <div>
+                <div className="flex items-center gap-2">
                   <Camera className="w-4 h-4 text-green-400 inline-block mr-1" />
-                  <span className="text-sm font-mono">Camera: {cameraID}</span>
+                  <h6 className="text-sm font-mono w-[300px] truncate">Camera: {cameraList.find(cam => cam.camera_id === cameraID)?.camera_name || cameraID}</h6>
                 </div>
                 <div className="flex items-center gap-2">
                   <img src="/expand.png" alt="expand" className={`w-6 p-1 opacity-60 cursor-pointer hover:opacity-100 transition-all duration-300 ${cameraExpanded ? 'rotate-180' : ''} ${isNativeFullscreen ? 'hidden' : ''}`} onClick={handleCameraExpand} title={`${cameraExpanded ? 'Collapse' : 'Expand'}`} />
@@ -284,32 +295,32 @@ export default function Dashboard() {
                   return (
                     <div
                       key={index}
-                      className="group w-full bg-slate-900/60 border border-slate-700 hover:border-blue-500/50 rounded-xl p-4 transition-all duration-300 mb-4 shadow-lg hover:shadow-blue-500/10"
+                      className="w-full bg-slate-900/60 border border-slate-700 hover:border-blue-500/50 rounded-xl p-4 transition-all duration-300 mb-4 shadow-lg hover:shadow-blue-500/10"
                     >
                       {/* Header: ID & Status */}
-                      <div className="flex justify-between items-center mb-3">
+                      <div className="w-full flex justify-between items-center mb-3">
                         <div className="flex items-center gap-2">
                           <div className="p-1.5 bg-blue-500/10 rounded-lg">
                             <Video className="w-4 h-4 text-blue-400" />
                           </div>
-                          <h3 className="text-white font-bold tracking-wide">CAM-{cam.camera_id}</h3>
+                          <h3 className="text-white font-bold tracking-wide w-[200px] truncate">{cam.camera_name}</h3>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <span className={`w-2 h-2 rounded-full animate-pulse ${cameraStatusColors[cam.status] || cameraStatusColors.unknown}`}></span>
-                          <span className="text-[10px] font-bold uppercase text-slate-400 tracking-tighter">{cam.status}</span>
+                          <span className="text-[10px] font-bold uppercase text-slate-400 tracking-tighter">{cam.status === 'active' ? 'ทำงาน' : (cam.status === 'maintenance' ? 'กำลังปรับปรุง' : 'ไม่ทำงาน')}</span>
                         </div>
                       </div>
 
                       {/* Camera Preview (Thumbnail) */}
                       <div
-                        className={`relative w-full h-[180px] bg-slate-950 rounded-lg border border-slate-800 overflow-hidden ${userPermission ? 'group-hover:border-slate-600 cursor-pointer' : ''} transition-colors`}
+                        className={`group relative w-full h-[180px] bg-slate-950 rounded-lg border border-slate-800 overflow-hidden ${userPermission ? 'group-hover:border-slate-600 cursor-pointer' : ''} transition-colors`}
                         onClick={() => handleCameraClick(cam.camera_id, userPermission)}
                       >
                         {/* Overlay เมื่อ Hover */}
                         {userPermission && (
                           <div className="absolute inset-0 bg-blue-500/0 group-hover:bg-blue-500/10 flex items-center justify-center transition-all">
                             <span className="opacity-0 group-hover:opacity-100 bg-blue-600 text-white text-xs px-3 py-1 rounded-full font-medium shadow-xl translate-y-2 group-hover:translate-y-0 transition-all">
-                              Select Camera
+                              เลือกกล้องนี้
                             </span>
                           </div>
                         )}
@@ -324,20 +335,26 @@ export default function Dashboard() {
                       {/* Info Grid */}
                       <div className="mt-4 grid grid-cols-2 gap-y-3 gap-x-2 border-t border-slate-800 pt-4">
                         {/* Location */}
-                        <div className="flex items-start gap-2">
-                          <MapPin className="w-3.5 h-3.5 text-slate-500 mt-0.5" />
+                        <div className="">
+                          <div className="flex items-center gap-2 mb-1">
+                            <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                            <p className="text-[11px] text-slate-500 uppercase font-bold leading-none">พิกัด</p>
+                          </div>
+                          
                           <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold leading-none mb-1">Position</p>
-                            <p className="text-xs text-slate-300 font-mono italic">{parseFloat(cam.latitude).toFixed(4)}, {parseFloat(cam.longitude).toFixed(4)}</p>
+                            <p className="text-xs text-slate-300 font-mono italic ml-[22px]">{parseFloat(cam.latitude).toFixed(4)}, {parseFloat(cam.longitude).toFixed(4)}</p>
                           </div>
                         </div>
 
                         {/* Heading */}
-                        <div className="flex items-start gap-2">
-                          <Compass className="w-3.5 h-3.5 text-slate-500 mt-0.5" />
+                        <div className="">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Compass className="w-3.5 h-3.5 text-slate-500" />
+                            <p className="text-[11px] text-slate-500 uppercase font-bold leading-none">ทิศทางที่ติดตั้ง</p>
+                          </div>
+                          
                           <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold leading-none mb-1">Heading</p>
-                            <p className="text-xs text-slate-300 font-mono">{cam.heading}°</p>
+                            <p className="text-xs text-slate-300 font-mono ml-[22px]">{cam.heading}° ({DIRECTION_LABELS(cam.heading)})</p>
                           </div>
                         </div>
 
@@ -345,7 +362,7 @@ export default function Dashboard() {
                         <div className="col-span-2 flex items-center gap-2 bg-slate-800/40 p-2 rounded-lg border border-slate-700/50">
                           <ShieldCheck className={`w-4 h-4 ${userPermission ? 'text-emerald-400' : 'text-slate-500'}`} />
                           <p className="text-xs font-medium">
-                            <span className="text-slate-500 mr-2">Level:</span>
+                            <span className="text-slate-500 mr-2">ระดับการใช้งาน:</span>
                             <span className={userPermission ? 'text-emerald-400 capitalize' : 'text-red-400'}>
                               {userPermission || 'Access Denied'}
                             </span>
