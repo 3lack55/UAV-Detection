@@ -9,6 +9,7 @@ import History from "../components/History.jsx";
 import CameraController from "../components/CameraController.jsx";
 import { useCameraPermissions } from "../context/CameraPermissionContext.jsx";
 import { useWebSocket } from "../context/WebsocketContext.jsx";
+import { HolderImage} from "../components/HolderImage.jsx";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
@@ -327,8 +328,7 @@ export default function Dashboard() {
 
                         {/* ใส่รูป Placeholder หรือข้อความ */}
                         <div className="w-full h-full flex flex-col items-center justify-center text-slate-700">
-                          <Activity className="w-8 h-8 mb-2 opacity-20" />
-                          <p className="text-[10px] font-mono uppercase tracking-[0.2em]">{cam.camera_name}</p>
+                          <HolderImage camera={cam} />
                         </div>
                       </div>
 

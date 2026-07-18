@@ -28,8 +28,10 @@ function getOrCreateSession(cameraId) {
         cameraSessions.set(cameraId, {
             viewers: new Set(),
             sender: null,
-            lastUnpacked: 0,
-            currentController: null
+            lastUnpacked: Date.now(),
+            currentController: null,
+            holderImage: null,
+            lastBoardcastHolderImage: Date.now()
         });
         console.log(`Created session: ${cameraId}`);
     }
@@ -145,6 +147,32 @@ export function broadcastSystemUpdate(event, data = {}) {
                 ws.send(JSON.stringify(payload));
             } catch (e) {
                 console.error(`Broadcast system update error: ${e.message}`);
+            }
+        }
+    }
+}
+
+export function broadcastHolderImage() {
+    const holderImages = {};
+    for (const [cameraId, session] of cameraSessions.entries()) {
+        if (session.holderImage) {
+            holderImages[cameraId] = { imageBuffer: session.holderImage.toString('base64') };
+        }
+    }
+
+    const payload = {
+        type: 'holder_image',
+        data: {
+            holderImages
+        }
+    };
+
+    for (const [ws] of clientSessions.entries()) {
+        if (ws.readyState === 1) {
+            try {
+                ws.send(JSON.stringify(payload));
+            } catch (e) {
+                console.error(`Broadcast holder image error: ${e.message}`);
             }
         }
     }
@@ -483,11 +511,17 @@ export function initializeWebSocket(server) {
                 const session = cameraSessions.get(`camera${cameraId}`);
                 if (!session) return;
 
+                if (session.lastBoardcastHolderImage && (Date.now() - session.lastBoardcastHolderImage > 10000) && session.holderImage) {
+                    broadcastHolderImage();
+                    session.lastBoardcastHolderImage = Date.now();
+                }
+
                 if (session.lastUnpacked && (Date.now() - session.lastUnpacked < 3000)) {
                     return;
                 }
                 let unpacked = unpackage(message);
-                session.lastUnpacked = Date.now();  
+                session.lastUnpacked = Date.now();
+                session.holderImage = unpacked?.image || null;
 
                 if (unpacked && unpacked.meta && unpacked.meta.uavs && unpacked.meta.uavs.length > 0) {
                     uavEventHandler(unpacked);
@@ -498,7 +532,11 @@ export function initializeWebSocket(server) {
                 if (isAuthenticated && cameraId) {
                     console.log(`Camera disconnected: camera${cameraId}`);
                     const s = cameraSessions.get(`camera${cameraId}`);
-                    if (s) s.sender = null;
+                    if (s) {
+                        s.sender = null;
+                        s.holderImage = null;
+                    }
+                    broadcastHolderImage();
                     await updateCameraStatus(cameraId, 'inactive');
                     console.log(`Total Camera Sessions: ${cameraSessions.size} | Total WebSocket Clients: ${wss.clients.size}`);
                 } else {

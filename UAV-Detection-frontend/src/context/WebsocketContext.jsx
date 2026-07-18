@@ -16,6 +16,7 @@ export function WebSocketProvider({ children }) {
     const [connected, setConnected] = useState(false);
     const [statusUpdate, setStatusUpdate] = useState(null);
     const [systemEvent, setSystemEvent] = useState(null);
+    const holderImageRef = useRef(null);
     const [reconnecting, setReconnecting] = useState(false);
 
     const audioContextRef = useRef(null);
@@ -163,6 +164,11 @@ export function WebSocketProvider({ children }) {
                     setStatusUpdate(nextStatus);
                     return;
                 }
+
+                if (parsedData.type === 'holder_image') {
+                    holderImageRef.current = parsedData.data.holderImages || {};
+                    return;
+                }
             } catch (error) {
                 console.error("Error parsing WebSocket message:", error);
             }
@@ -248,9 +254,10 @@ export function WebSocketProvider({ children }) {
         connected,
         statusUpdate,
         systemEvent,
+        holderImageRef,
         sendMessage,
         reconnecting,
-    }), [connected, statusUpdate, systemEvent, sendMessage, reconnecting]);
+    }), [connected, statusUpdate, systemEvent, holderImageRef, sendMessage, reconnecting]);
 
     return (
         <WebSocketContext.Provider value={contextValue}>
