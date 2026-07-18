@@ -60,10 +60,7 @@ const HeadingReadout = memo(function HeadingReadout() {
   );
 });
 
-function CameraControllerInner({ cameraID, permission = "", onControl, active = false }) {
-  const streamViewer = useStreamViewer() || {};
-  const cameraControlable = streamViewer.metaData?.controlable ?? false;
-
+function CameraControllerInner({ cameraID, permission = "", onControl, active = false, controllable = false }) {
   const [controlTypes, setControlTypes] = useState("continuously");
   const [degree, setDegree] = useState(5);
   const [degreeInput, setDegreeInput] = useState("5");
@@ -176,7 +173,7 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
         <div className="flex gap-2">
           {active ? (
             hasControl ? (
-              cameraControlable ? (
+              controllable ? (
                 <span className="text-[10px] font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
                   การควบคุมพร้อมใช้งาน
                 </span>
@@ -216,7 +213,7 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
             </div>
           </div>
         ) : (
-          cameraControlable ? (
+          controllable ? (
             <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-4 py-2">
               <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">โหมด: </span>
               <div className="flex gap-1">

@@ -22,7 +22,7 @@ export function HolderImage({ camera }) {
 
         const interval = setInterval(() => {
             setNewImageForThisCamera();
-        }, 10000);
+        }, 5000);
 
         return () => clearInterval(interval);
     }, [cameraId]);
@@ -34,7 +34,7 @@ export function HolderImage({ camera }) {
             ) : (
                 <div className='flex flex-col items-center justify-center'>
                     <Activity className="w-8 h-8 mb-2 opacity-20" />
-                    <p className="text-[10px] font-mono uppercase tracking-[0.2em]">{camera.camera_name}</p>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.2em] max-w-[200px] truncate">{camera.camera_name}</p>
                 </div>
             )}
         </div>

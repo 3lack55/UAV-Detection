@@ -440,6 +440,7 @@ export default function Dashboard() {
                   cameraID={cameraID}
                   permission={permissionMap[cameraID]}
                   active={cameraList.some(cam => cam.camera_id === cameraID && cam.status === 'active')}
+                  controllable={cameraList.some(cam => cam.camera_id === cameraID && cam.controllable === 1)}
                   onControl={(command) => controlSenderRef.current?.(command)}
                 />
               </div>
