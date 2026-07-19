@@ -51,7 +51,7 @@ cameraRouter.patch("/updateCamera/:cameraId", protect, async (req, res) => {
         if (latitude !== null) updateFields.push(`latitude = ${latitude}`);
         if (longitude !== null) updateFields.push(`longitude = ${longitude}`);
         if (status !== null) updateFields.push(`status = '${status}'`);
-        if (heading !== null) updateFields.push(`heading = ${heading}`);
+        if (heading !== null) updateFields.push(`heading = ${parseInt(heading)}`);
 
         const result = await doQuery(`UPDATE cameras SET ${updateFields.join(', ')}, last_update = NOW() WHERE camera_id = ${req.params.cameraId}`);
         if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Camera ID ${req.params.cameraId} not found.` });
@@ -129,7 +129,7 @@ cameraRouter.patch("/updateStatus/:cameraId", async (req, res) => {
         if (latitude !== null) updateFields.push(`latitude = ${latitude}`);
         if (longitude !== null) updateFields.push(`longitude = ${longitude}`);
         if (status !== null) updateFields.push(`status = '${status}'`);
-        if (heading !== null) updateFields.push(`heading = ${heading}`);
+        if (heading !== null) updateFields.push(`heading = ${parseInt(heading)}`);
         if (controllable !== null) updateFields.push(`controllable = ${controllable}`);
 
         console.log("Updating camera with fields:", updateFields);

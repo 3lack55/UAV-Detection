@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { Map, Satellite } from 'lucide-react';
+import { useWebSocket } from "../context/WebsocketContext.jsx";
 
 const useLeafletLoader = () => {
     const [isLoaded, setIsLoaded] = useState(false);
@@ -58,7 +59,7 @@ const createBaseIcon = (label = "CAM", status = "maintenance") => {
     });
 };
 
-const createBasePopupContent = (base) => `
+const createBasePopupContent = (base, live) => `
     <div class="tactical-popup station-popup">
         <div class="popup-header" style="border-left: 4px solid ${COLORS[base.status]}; padding-left: 10px; margin-bottom: 12px;">
             <div style="font-size: 10px; color: #94a3b8; letter-spacing: 2px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">
@@ -82,13 +83,24 @@ const createBasePopupContent = (base) => `
             </div>
 
             <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 10px; color: #64748b; font-weight: bold;">HEADING ANGLE:</span>
-                <span style="font-size: 12px; color: ${COLORS[base.status]}; font-weight: 900; font-family: monospace;">${base.heading}°</span>
+                <span style="font-size: 10px; color: #64748b; font-weight: bold;">INSTALL FACE (ทิศติดตั้ง):</span>
+                <span style="font-size: 12px; color: ${COLORS[base.status]}; font-weight: 900; font-family: monospace;">${live ? live.installFace : base.heading}°</span>
             </div>
+
+            ${live ? `
+            <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 10px; color: #64748b; font-weight: bold;">CURRENT PAN:</span>
+                <span style="font-size: 12px; color: #e2e8f0; font-weight: 900; font-family: monospace;">${live.pan}°</span>
+            </div>
+            <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-size: 10px; color: #64748b; font-weight: bold;">CURRENT HEADING:</span>
+                <span style="font-size: 12px; color: #e2e8f0; font-weight: 900; font-family: monospace;">${live.currentHeading}°</span>
+            </div>
+            ` : ''}
         </div>
         
         <div style="margin-top: 8px; font-size: 9px; color: #475569; text-align: center; letter-spacing: 1px;">
-            ${base.last_update ? `อัพเดตล่าสุด: ${new Date(base.last_update).toLocaleString('th-TH')}` : 'ไม่พบข้อมูลอัพเดตล'}
+            ${live?.timestamp ? `อัพเดตล่าสุด: ${new Date(live.timestamp).toLocaleString('th-TH')}` : (base.last_update ? `อัพเดตล่าสุด: ${new Date(base.last_update).toLocaleString('th-TH')}` : 'ไม่พบข้อมูลอัพเดตล')}
         </div>
     </div>
 `;
@@ -111,6 +123,26 @@ const MapControls = memo(({ mapType, setMapType, onReset }) => {
     );
 });
 
+const normalizeAngle = (angle) => ((Number(angle) % 360) + 360) % 360;
+
+const DIRECTION_ARROW_COLOR = '#F54927';
+const DIRECTION_ARROW_LENGTH_METERS = 30;
+
+const createDirectionArrowHeadIcon = (angle, color = DIRECTION_ARROW_COLOR) => {
+    if (!window.L) return null;
+    return window.L.divIcon({
+        className: 'custom-direction-arrowhead',
+        html: `
+            <div style="width:26px; height:26px; transform: rotate(${normalizeAngle(angle)}deg); transform-origin: 50% 50%; pointer-events: none;">
+                <svg width="26" height="26" viewBox="0 0 26 26" style="overflow: visible;">
+                    <polygon points="13,0 3,20 13,15 23,20" fill="${color}" stroke="#0f172a" stroke-width="1.5" stroke-linejoin="round"></polygon>
+                </svg>
+            </div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+    });
+};
+
 const getDestinationPoint = (lat, lng, distance, bearing) => {
     const R = 6378137; // รัศมีโลก (เมตร)
     const d = distance / R;
@@ -129,12 +161,11 @@ const createSectorPoints = (lat, lng, radius, heading, status, fov = 65) => {
     const startAngle = heading - (fov / 2);
     const endAngle = heading + (fov / 2);
 
-    // วาดส่วนโค้งทุกๆ 5 องศาเพื่อให้พัดดูมน
     for (let i = startAngle; i <= endAngle; i += 5) {
         points.push(getDestinationPoint(lat, lng, radius, i));
     }
 
-    points.push([lat, lng]); // กลับมาปิดที่จุดศูนย์กลาง
+    points.push([lat, lng]); 
     return points;
 };
 
@@ -156,6 +187,52 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
     const baseLayersRef = useRef([]);
 
     const defaultCenter = [{ lat: 14.9844, lng: 102.1189 }];
+
+    const { allMetaDataRef } = useWebSocket();
+    const [liveMeta, setLiveMeta] = useState({});
+
+    useEffect(() => {
+        const readMetaData = () => {
+            const data = allMetaDataRef?.current;
+            if (!data) return;
+
+            const parsed = {};
+            Object.values(data).forEach((camData) => {
+                const camId = camData?.camera?.camera_id;
+                if (camId === undefined || camId === null) return;
+
+                parsed[String(camId)] = {
+                    pan: camData.heading?.currentPan ?? 0,
+                    tilt: camData.heading?.currentTilt ?? 0,
+                    installFace: camData.heading?.installFace ?? 0,
+                    timestamp: camData.timestamp || null,
+                };
+            });
+
+            setLiveMeta(parsed);
+        };
+
+        readMetaData(); 
+        const intervalId = setInterval(readMetaData, 3000);
+
+        return () => clearInterval(intervalId);
+    }, [allMetaDataRef]);
+
+    const enrichedBasePosition = useMemo(() => {
+        return basePosition.map((b) => {
+            const live = liveMeta[String(b.id)];
+            const installFace = live ? live.installFace : b.heading;
+            const pan = live ? live.pan : 0;
+            const currentHeading = normalizeAngle(installFace + pan);
+
+            return {
+                ...b,
+                installFace: normalizeAngle(installFace),
+                currentHeading,
+                live: live ? { ...live, installFace: normalizeAngle(installFace), currentHeading } : null,
+            };
+        });
+    }, [basePosition, liveMeta]);
 
     // Init Map
     useEffect(() => {
@@ -198,28 +275,6 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
     }, [mapReady]);
 
     useEffect(() => {
-        if (!mapInstance.current || !window.L || !mapReady) return;
-        const map = mapInstance.current;
-        baseLayersRef.current.forEach(layer => map.removeLayer(layer));
-        baseLayersRef.current = [];
-
-        basePosition.forEach(b => {
-            // 1. วาดรัศมีรูปพัด 50 เมตร (FOV)
-            const sectorPoints = createSectorPoints(b.lat, b.lng, 100, b.heading, b.status, 90);
-            const fovPolygon = window.L.polygon(sectorPoints, {
-                color: COLORS[b.status], weight: 1, fillColor: COLORS[b.status], fillOpacity: 0.15, dashArray: '5, 5', interactive: false
-            }).addTo(map);
-
-            // 2. วางไอคอนกล้อง
-            const marker = window.L.marker([b.lat, b.lng], {
-                icon: createBaseIcon(b.name.split(' ')[0], b.status)
-            }).addTo(map).bindPopup(createBasePopupContent(b));
-
-            baseLayersRef.current.push(fovPolygon, marker);
-        });
-    }, [basePosition, mapReady]);
-
-    useEffect(() => {
         if (typeof window !== 'undefined') {
             window.localStorage.setItem('boboMapType', mapType);
         }
@@ -258,27 +313,43 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
         if (!mapInstance.current || !window.L || !mapReady) return;
 
         const map = mapInstance.current;
-        
+
         const detectingIds = new Set(detectingCameras?.map(cam => typeof cam === 'object' ? cam.cameraId : cam) || []);
-        
+
         baseLayersRef.current.forEach(layer => map.removeLayer(layer));
         baseLayersRef.current = [];
 
-        basePosition.forEach(b => {
+        enrichedBasePosition.forEach(b => {
             const status = detectingIds.has(String(b.id)) ? 'threat' : b.status;
-            
-            const sectorPoints = createSectorPoints(b.lat, b.lng, 100, b.heading, status, 90);
+
+            const sectorPoints = createSectorPoints(b.lat, b.lng, 100, b.currentHeading, status, 90);
             const fovPolygon = window.L.polygon(sectorPoints, {
                 color: COLORS[status], weight: 1, fillColor: COLORS[status], fillOpacity: 0.15, dashArray: '5, 5', interactive: false
             }).addTo(map);
 
+            const arrowEndPoint = getDestinationPoint(b.lat, b.lng, DIRECTION_ARROW_LENGTH_METERS, b.installFace);
+
+            const directionLineCasing = window.L.polyline([[b.lat, b.lng], arrowEndPoint], {
+                color: '#0f172a', weight: 6, opacity: 0.85, interactive: false,
+            }).addTo(map);
+
+            const directionLine = window.L.polyline([[b.lat, b.lng], arrowEndPoint], {
+                color: DIRECTION_ARROW_COLOR, weight: 3, opacity: 1, interactive: false,
+            }).addTo(map);
+
+            const directionArrowHead = window.L.marker(arrowEndPoint, {
+                icon: createDirectionArrowHeadIcon(b.installFace),
+                interactive: false,
+                zIndexOffset: -50,
+            }).addTo(map);
+
             const marker = window.L.marker([b.lat, b.lng], {
                 icon: createBaseIcon(b.name.split(' ')[0], status)
-            }).addTo(map).bindPopup(createBasePopupContent(b));
+            }).addTo(map).bindPopup(createBasePopupContent(b, b.live));
 
-            baseLayersRef.current.push(fovPolygon, marker);
+            baseLayersRef.current.push(fovPolygon, directionLineCasing, directionLine, directionArrowHead, marker);
         });
-    }, [detectingCameras, basePosition, mapReady]);
+    }, [detectingCameras, enrichedBasePosition, mapReady]);
 
     return (
         <div className="w-full h-full flex flex-col bg-gray-900 overflow-hidden border border-slate-700">

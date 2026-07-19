@@ -17,6 +17,7 @@ export function WebSocketProvider({ children }) {
     const [statusUpdate, setStatusUpdate] = useState(null);
     const [systemEvent, setSystemEvent] = useState(null);
     const holderImageRef = useRef(null);
+    const allMetaDataRef = useRef(null);
     const [reconnecting, setReconnecting] = useState(false);
 
     const audioContextRef = useRef(null);
@@ -123,7 +124,7 @@ export function WebSocketProvider({ children }) {
                 // Handle auth response
                 if (parsedData.type === 'auth_response') {
                     if (parsedData.success) {
-                        console.log("Client WebSocket authenticated");
+                        // console.log("Client WebSocket authenticated");
                         setConnected(true);
                         setReconnecting(false);
                         if (reconnectIntervalRef.current) {
@@ -169,13 +170,18 @@ export function WebSocketProvider({ children }) {
                     holderImageRef.current = parsedData.data.holderImages || {};
                     return;
                 }
+
+                if (parsedData.type === 'meta_data') {
+                    allMetaDataRef.current = parsedData.data.metaData || {};
+                    return;
+                }
             } catch (error) {
                 console.error("Error parsing WebSocket message:", error);
             }
         };
 
         ws.onclose = () => {
-            console.log("Client WebSocket disconnected.");
+            // console.log("Client WebSocket disconnected.");
             setConnected(false);
             setReconnecting(true);
 
@@ -248,16 +254,15 @@ export function WebSocketProvider({ children }) {
         }
     }, []);
 
-    // console.log("WebSocketContext Rendered: ");
-
     const contextValue = useMemo(() => ({
         connected,
         statusUpdate,
         systemEvent,
         holderImageRef,
+        allMetaDataRef,
         sendMessage,
         reconnecting,
-    }), [connected, statusUpdate, systemEvent, holderImageRef, sendMessage, reconnecting]);
+    }), [connected, statusUpdate, systemEvent, holderImageRef, allMetaDataRef, sendMessage, reconnecting]);
 
     return (
         <WebSocketContext.Provider value={contextValue}>

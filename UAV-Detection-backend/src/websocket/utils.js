@@ -18,6 +18,7 @@ export function getOrCreateSession(cameraId) {
             lastUnpacked: Date.now(),
             currentController: null,
             holderImage: null,
+            metaData: null,
             lastBoardcastHolderImage: Date.now()
         });
         console.log(`Created session: ${cameraId}`);

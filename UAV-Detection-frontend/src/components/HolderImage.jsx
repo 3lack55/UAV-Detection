@@ -22,7 +22,7 @@ export function HolderImage({ camera }) {
 
         const interval = setInterval(() => {
             setNewImageForThisCamera();
-        }, 5000);
+        }, 10000);
 
         return () => clearInterval(interval);
     }, [cameraId]);

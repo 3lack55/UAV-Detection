@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { cameraSessions, JWT_SECRET } from '../state.js';
 import { getOrCreateSession, unpackage } from '../utils.js';
-import { broadcastToViewers, broadcastHolderImage } from '../broadcast.js';
+import { broadcastToViewers, broadcastHolderImage, broadcastMetaData } from '../broadcast.js';
 import { updateCameraStatus } from '../cameraStatus.js';
 import { uavEventHandler } from '../eventManager.js';
 import { doQuery } from '../../database/mysqlConnection.js';
@@ -100,6 +100,9 @@ export function handleCameraConnection(ws, wss) {
         let unpacked = unpackage(message);
         session.lastUnpacked = Date.now();
         session.holderImage = unpacked?.image || null;
+        session.metaData = unpacked?.meta || null;
+
+        broadcastMetaData();
 
         if (unpacked && unpacked.meta && unpacked.meta.uavs && unpacked.meta.uavs.length > 0) {
             uavEventHandler(unpacked);
@@ -110,12 +113,18 @@ export function handleCameraConnection(ws, wss) {
         if (isAuthenticated && cameraId) {
             console.log(`Camera disconnected: camera${cameraId}`);
             const s = cameraSessions.get(`camera${cameraId}`);
+
+            await updateCameraStatus(cameraId, 'inactive', s.metaData || null);
+
             if (s) {
                 s.sender = null;
                 s.holderImage = null;
+                s.metaData = null;
             }
+            
             broadcastHolderImage();
-            await updateCameraStatus(cameraId, 'inactive');
+            broadcastMetaData();
+            
             console.log(`Total Camera Sessions: ${cameraSessions.size} | Total WebSocket Clients: ${wss.clients.size}`);
         } else {
             console.log("Unauthenticated camera connection closed");

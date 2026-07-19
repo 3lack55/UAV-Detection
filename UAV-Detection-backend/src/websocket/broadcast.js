@@ -139,3 +139,29 @@ export function invalidateUserSession(userId, reason = 'Your session has been in
 
     broadcastToClients();
 }
+
+export function broadcastMetaData() {
+    const metaDataPayload = {};
+    for (const [cameraId, session] of cameraSessions.entries()) {
+        if (session.metaData) {
+            metaDataPayload[cameraId] = session.metaData;
+        }
+    }
+
+    const payload = {
+        type: 'meta_data',
+        data: {
+            metaData: metaDataPayload
+        }
+    };
+
+    for (const [ws] of clientSessions.entries()) {
+        if (ws.readyState === 1) {
+            try {
+                ws.send(JSON.stringify(payload));
+            } catch (e) {
+                console.error(`Broadcast meta data error: ${e.message}`);
+            }
+        }
+    }
+}
