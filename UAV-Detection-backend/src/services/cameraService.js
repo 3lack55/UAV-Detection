@@ -132,8 +132,6 @@ cameraRouter.patch("/updateStatus/:cameraId", async (req, res) => {
         if (heading !== null) updateFields.push(`heading = ${parseInt(heading)}`);
         if (controllable !== null) updateFields.push(`controllable = ${controllable}`);
 
-        console.log("Updating camera with fields:", updateFields);
-
         const result = await doQuery(`UPDATE cameras SET ${updateFields.join(', ')}, last_update = NOW() WHERE camera_id = ${req.params.cameraId}`);
         if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Camera ID ${req.params.cameraId} not found.` });
         broadcastSystemUpdate("camera_changed", { action: "updated", cameraId: req.params.cameraId, camera: { camera_id: req.params.cameraId, ...req.body } });

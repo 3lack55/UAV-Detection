@@ -9,6 +9,7 @@ import {
   LoaderCircle
 } from 'lucide-react';
 import { useStreamViewer } from '../context/StreamViwerContext';
+import { Supervisor } from './Supervisor';
 
 const ControlBtn = memo(function ControlBtn({ children, className = '', onClick, disabled }) {
   return (
@@ -168,6 +169,8 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
         <div className="flex items-center gap-2">
           <Camera className="w-5 h-5 text-blue-400" />
           <h2 className="font-bold text-sm tracking-widest uppercase text-slate-300">CAM-{cameraID}</h2>
+          <div className="w-0.5 h-6 bg-gray-600 rounded-full"></div>
+          <Supervisor></Supervisor>
         </div>
 
         <div className="flex gap-2">

@@ -43,15 +43,14 @@ function Topbar() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${user.token}`
                 },
-                body: JSON.stringify({ query })
+                body: JSON.stringify({ userIds: query })
             });
             const data = await response.json();
             setOnlineUsers(data.data);
         };
         if (statusUpdate && statusUpdate.onlineUsers !== undefined && statusUpdate.onlineUsers.length !== 0) {
-            const users = statusUpdate.onlineUsers;
-            const query = "SELECT * FROM users WHERE user_id IN (" + users.map((u) => u.userId).join(',') + ")";
-            fetchOnlineUsers(query);
+            const userIds = statusUpdate.onlineUsers.map((u) => u.userId);
+            fetchOnlineUsers(userIds);
         }
     }, [statusUpdate]);
 

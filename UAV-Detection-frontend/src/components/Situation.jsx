@@ -117,7 +117,7 @@ export function Situation({ detectingCameras = [], cameras = [], permissionMap =
                             )}
 
                             {/* Status Bar (Left Side) */}
-                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${status.color.replace('text', 'bg')}`} />
+                            {/* <div className={`absolute left-0 top-0 bottom-0 w-1 ${status.color.replace('text', 'bg')}`} /> */}
 
                             <div className="flex justify-between items-start relative z-10">
                                 <div className="flex items-center gap-2 w-[60%]">

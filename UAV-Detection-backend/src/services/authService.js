@@ -170,9 +170,17 @@ authRouter.post('/upload-profile-image', protect, (req, res, next) => {
 });
 
 authRouter.post('/userQuery', protect, async (req, res) => {
-    const { query } = req.body;
+    const { userIds } = req.body;
     try {
-        const results = await doQuery(query);
+        if (!Array.isArray(userIds) || userIds.length === 0) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const results = await doQuery(
+            'SELECT user_id, username, profile_image FROM users WHERE user_id IN (?)',
+            [userIds]
+        );
+
         res.json({ success: true, data: results });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error', error: error.message });

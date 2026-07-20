@@ -182,7 +182,7 @@ export default function Dashboard() {
   }
 
   return (
-    <StreamViewerProvider cameraID={cameraID}>
+    <StreamViewerProvider cameraID={cameraID} permission={permissionMap[cameraID]} >
       <>
         {/* Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-[10000] space-y-3 pointer-events-none">
@@ -441,7 +441,7 @@ export default function Dashboard() {
                   permission={permissionMap[cameraID]}
                   active={cameraList.some(cam => cam.camera_id === cameraID && cam.status === 'active')}
                   controllable={cameraList.some(cam => cam.camera_id === cameraID && cam.controllable === 1)}
-                  onControl={(command) => controlSenderRef.current?.(command)}
+                  onControl={(command, params) => controlSenderRef.current?.(command, params)}
                 />
               </div>
             </div>

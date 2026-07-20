@@ -7,7 +7,7 @@ const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
 const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "ws";
 
-export function StreamViewerProvider({ cameraID, children }) {
+export function StreamViewerProvider({ cameraID, permission, children }) {
     const { connected: mainConnected } = useWebSocket();
     const [status, setStatus] = useState("Disconnected");
     const [fpsDisplay, setFpsDisplay] = useState(0);
@@ -90,6 +90,7 @@ export function StreamViewerProvider({ cameraID, children }) {
             wsRef.current = ws;
 
             ws.onopen = () => {
+                ws.send(JSON.stringify({ type: "auth", token: sessionStorage.getItem("token"), permission: permission }));
                 if (isMounted) {
                     setStatus("Ready...");
                     clearTimeout(reconnectTimeoutRef.current);

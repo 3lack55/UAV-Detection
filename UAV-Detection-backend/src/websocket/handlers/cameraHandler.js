@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { cameraSessions, JWT_SECRET } from '../state.js';
 import { getOrCreateSession, unpackage } from '../utils.js';
-import { broadcastToViewers, broadcastHolderImage, broadcastMetaData } from '../broadcast.js';
+import { broadcastToViewers, broadcastHolderImage, broadcastMetaData, broadcastToClients } from '../broadcast.js';
 import { updateCameraStatus } from '../cameraStatus.js';
 import { uavEventHandler } from '../eventManager.js';
 import { doQuery } from '../../database/mysqlConnection.js';
@@ -120,10 +120,12 @@ export function handleCameraConnection(ws, wss) {
                 s.sender = null;
                 s.holderImage = null;
                 s.metaData = null;
+                s.currentController = null;
             }
             
             broadcastHolderImage();
             broadcastMetaData();
+            broadcastToClients();
             
             console.log(`Total Camera Sessions: ${cameraSessions.size} | Total WebSocket Clients: ${wss.clients.size}`);
         } else {

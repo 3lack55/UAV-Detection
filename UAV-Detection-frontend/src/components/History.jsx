@@ -86,7 +86,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                             <div
                                 key={`unread-${e.event_id}`}
                                 className={`relative w-full p-4 rounded-xl transition-all duration-200 cursor-pointer
-                                        'bg-slate-800/80 border border-slate-600 border-l-4 border-l-red-500 shadow-md shadow-red-900/10 hover:bg-slate-700'
+                                        'bg-slate-800/80 border border-red-900  shadow-md shadow-red-900/10 hover:bg-slate-700'
                                         ${isFetching ? 'opacity-70 cursor-wait pointer-events-none' : ''}
                                 `}
                                 onClick={() => {

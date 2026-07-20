@@ -19,6 +19,7 @@ export function WebSocketProvider({ children }) {
     const holderImageRef = useRef(null);
     const allMetaDataRef = useRef(null);
     const [reconnecting, setReconnecting] = useState(false);
+    const [authRequired, setAuthRequired] = useState(false);
 
     const audioContextRef = useRef(null);
     const audioInitializedRef = useRef(false);
@@ -113,7 +114,6 @@ export function WebSocketProvider({ children }) {
         socketRef.current = ws;
 
         ws.onopen = () => {
-            // Send token as message after connection
             ws.send(JSON.stringify({ type: 'auth', token }));
         };
 
@@ -121,10 +121,9 @@ export function WebSocketProvider({ children }) {
             try {
                 const parsedData = JSON.parse(event.data);
 
-                // Handle auth response
                 if (parsedData.type === 'auth_response') {
                     if (parsedData.success) {
-                        // console.log("Client WebSocket authenticated");
+                        setAuthRequired(false);
                         setConnected(true);
                         setReconnecting(false);
                         if (reconnectIntervalRef.current) {
@@ -145,7 +144,14 @@ export function WebSocketProvider({ children }) {
 
                 if (parsedData.type === 'auth_required') {
                     shouldReconnectRef.current = false;
-                    logout();
+                    if (reconnectIntervalRef.current) {
+                        clearInterval(reconnectIntervalRef.current);
+                        reconnectIntervalRef.current = null;
+                    }
+                    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+                        socketRef.current.close();
+                    }
+                    setAuthRequired(true);
                     setConnected(false);
                     setReconnecting(false);
                     return;
@@ -262,7 +268,9 @@ export function WebSocketProvider({ children }) {
         allMetaDataRef,
         sendMessage,
         reconnecting,
-    }), [connected, statusUpdate, systemEvent, holderImageRef, allMetaDataRef, sendMessage, reconnecting]);
+        authRequired,
+        clearAuthRequired: () => setAuthRequired(false),
+    }), [connected, statusUpdate, systemEvent, holderImageRef, allMetaDataRef, sendMessage, reconnecting, authRequired]);
 
     return (
         <WebSocketContext.Provider value={contextValue}>
