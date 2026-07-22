@@ -8,7 +8,7 @@ const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
 const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
 const API_BASE_URL = `${PROTOCOL}://${HOST}:${HOST_PORT}`;
 
-function Supervisor() {
+function Supervisor( {cameraId} ) {
     const { statusUpdate } = useWebSocket();
     const { user } = useAuth();
     const [controllingUsers, setControllingUsers] = useState([]);
@@ -16,12 +16,13 @@ function Supervisor() {
     const userIds = useMemo(() => {
         if (statusUpdate?.onControlCameras && Array.isArray(statusUpdate.onControlCameras)) {
             const ids = statusUpdate.onControlCameras
+                .filter((u) => u.cameraId === cameraId || u.cameraId === `camera${cameraId}`)
                 .map((u) => u.controller?.userId)
                 .filter(id => id != null);
             return ids.length > 0 ? ids : null;
         }
         return null;
-    }, [statusUpdate?.onControlCameras]);
+    }, [statusUpdate?.onControlCameras, cameraId]);
 
     useEffect(() => {
         if (!userIds || !user?.token) {
@@ -51,8 +52,6 @@ function Supervisor() {
         fetchControllingUsers();
     }, [userIds, user?.token]);
 
-    console.log(statusUpdate?.onControlCameras, controllingUsers);
-
     return (
         <>
             <div className="flex items-center gap-2">
@@ -64,7 +63,7 @@ function Supervisor() {
                                 key={u.user_id}
                                 src={u.profile_image ? `${API_BASE_URL}/uploads/user_profile/${u.profile_image}` : "account.png"}
                                 alt={u.username}
-                                title={u.username}
+                                title={`${u.username} ควบคุมอยู่`}
                                 className="w-7 h-7 rounded-full border-2 border-blue-500 object-cover"
                             />
                         ))}

@@ -65,7 +65,7 @@ function AuthRequiredModal() {
       <div className="w-full max-w-md rounded-xl bg-slate-900 p-6 text-center shadow-2xl border border-slate-700">
         <h3 className="text-xl font-semibold text-white">การยืนยันตัวตนล้มเหลว</h3>
         <p className="mt-3 text-sm text-slate-300">
-          เซสชันของคุณถูกยกเลิกโดยเซิร์ฟเวอร์ กรุณากดปุ่มด้านล่างเพื่อออกจากระบบด้วยตนเอง
+          เซสชันของคุณถูกยกเลิก กรุณาเข้าสู่ระบบอีกครั้ง
         </p>
         <div className="mt-6 flex justify-center">
           <button

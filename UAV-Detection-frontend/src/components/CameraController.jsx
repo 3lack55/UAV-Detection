@@ -67,6 +67,8 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
   const [degreeInput, setDegreeInput] = useState("5");
   const [feedback, setFeedback] = useState(null);
   const [isSending, setIsSending] = useState(false);
+  const streamViewer = useStreamViewer() || {};
+  const serverFeedback = streamViewer.controlFeedback;
 
   const hasControl = permission === "admin" || permission === "operator";
   const isReady = hasControl && active;
@@ -127,8 +129,6 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
           await result;
         }
       }
-
-      setFeedback({ type: 'success', message: 'ส่งคำสั่งเรียบร้อยแล้ว' });
     } catch (error) {
       setFeedback({
         type: 'error',
@@ -152,16 +152,20 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
   };
 
   useEffect(() => {
-    if (!feedback || feedback.type !== 'success') {
+    if (!serverFeedback?.type || !serverFeedback?.success && !serverFeedback?.reason) {
       return;
     }
 
+    const severity = serverFeedback.success ? 'success' : 'error';
+    const message = serverFeedback.message || serverFeedback.reason || 'ไม่มีข้อความตอบกลับจากเซิร์ฟเวอร์';
+    setFeedback({ type: severity, message });
+
     const timer = window.setTimeout(() => {
       setFeedback(null);
-    }, 1500);
+    }, 2500);
 
     return () => window.clearTimeout(timer);
-  }, [feedback]);
+  }, [serverFeedback]);
 
   return (
     <div className="w-full h-full flex flex-col bg-slate-900/80 text-slate-100 shadow-2xl border border-slate-700/50 backdrop-blur-md">
@@ -170,7 +174,7 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
           <Camera className="w-5 h-5 text-blue-400" />
           <h2 className="font-bold text-sm tracking-widest uppercase text-slate-300">CAM-{cameraID}</h2>
           <div className="w-0.5 h-6 bg-gray-600 rounded-full"></div>
-          <Supervisor></Supervisor>
+          <Supervisor cameraId={cameraID}/>
         </div>
 
         <div className="flex gap-2">

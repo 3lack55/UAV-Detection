@@ -121,11 +121,12 @@ function Topbar() {
                     </div>
 
                     {showAllUsers && hasUsers && (
-                        <div className="absolute right-0 mt-2 w-56 max-h-72 overflow-y-auto bg-slate-800 border border-blue-500 rounded-lg shadow-lg z-[1002]">
+                        <div className="absolute right-0 mt-2 w-56 max-h-72 overflow-y-auto bg-slate-800 border border-blue-500 rounded-lg shadow-lg z-[1002] pt-2">
+                            <p className="text-xs text-slate-400 ml-4 mb-1">กำลังใช้งาน {onlineUsers.length} ผู้ใช้</p>
                             {onlineUsers.map((u) => (
                                 <div
                                     key={u.user_id}
-                                    className="flex items-center gap-2 px-3 py-2 hover:bg-slate-700/50"
+                                    className="flex items-center gap-2 pr-3 pl-5 py-2 hover:bg-slate-700/50"
                                 >
                                     <img
                                         src={u.profile_image ? `${apiBaseUrl}/uploads/user_profile/${u.profile_image}` : "account.png"}

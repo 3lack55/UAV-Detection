@@ -14,6 +14,7 @@ export function StreamViewerProvider({ cameraID, permission, children }) {
     const [frame, setFrame] = useState(null);
     const [metaData, setMetaData] = useState(null);
     const [isCameraConnected, setIsCameraConnected] = useState(false);
+    const [controlFeedback, setControlFeedback] = useState(null);
 
     const wsRef = useRef(null);
     const reconnectTimeoutRef = useRef(null);
@@ -29,6 +30,7 @@ export function StreamViewerProvider({ cameraID, permission, children }) {
         setMetaData(null);
         setIsCameraConnected(false);
         setFpsDisplay(0);
+        setControlFeedback(null);
     }, []);
 
     const sendControlMessage = useCallback((command, payload = {}) => {
@@ -98,9 +100,19 @@ export function StreamViewerProvider({ cameraID, permission, children }) {
             };
 
             ws.onmessage = (event) => {
-                if (!isMounted || !(event.data instanceof ArrayBuffer)) return;
+                if (!isMounted) return;
 
                 try {
+                    if (typeof event.data === "string") {
+                        const parsedData = JSON.parse(event.data);
+                        if (parsedData?.type === "control_feedback") {
+                            setControlFeedback(parsedData);
+                            return;
+                        }
+                    }
+
+                    if (!(event.data instanceof ArrayBuffer)) return;
+
                     const buffer = event.data;
                     const view = new DataView(buffer);
                     const jsonLen = view.getUint32(0, true);
@@ -172,7 +184,8 @@ export function StreamViewerProvider({ cameraID, permission, children }) {
         fpsDisplay,
         isCameraConnected,
         sendControlMessage,
-    }), [frame, metaData, status, fpsDisplay, isCameraConnected, sendControlMessage]);
+        controlFeedback,
+    }), [frame, metaData, status, fpsDisplay, isCameraConnected, sendControlMessage, controlFeedback]);
 
     return (
         <StreamViewerContext.Provider value={contextValue}>
@@ -189,6 +202,5 @@ export const useStreamViewer = () => {
     status: 'Disconnected',
     fpsDisplay: 0,
     isCameraConnected: false,
-    sendControlMessage: () => {},
-  };
+    sendControlMessage: () => {},    controlFeedback: null,  };
 };

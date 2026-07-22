@@ -1,7 +1,35 @@
-import { cameraSessions, JWT_SECRET } from '../state.js';
+import { cameraSessions, JWT_SECRET, controllerTimeout } from '../state.js';
 import { getOrCreateSession } from '../utils.js';
 import { broadcastToClients } from '../broadcast.js';
 import jwt from 'jsonwebtoken';
+
+function sendControlFeedback(ws, payload) {
+    if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(payload));
+    }
+}
+
+function clearStaleControllers() {
+    const now = Date.now();
+    let hasChange = false;
+
+    for (const [sessionCameraId, session] of cameraSessions.entries()) {
+        const currentController = session.currentController;
+        if (!currentController?.lastControlAt) continue;
+
+        if (now - currentController.lastControlAt > controllerTimeout) {
+            session.currentController = null;
+            hasChange = true;
+            console.log(`Controller timeout cleared for camera ${sessionCameraId}`);
+        }
+    }
+
+    if (hasChange) {
+        broadcastToClients();
+    }
+}
+
+setInterval(() => clearStaleControllers(), 3000);
 
 // --- กรณีเป็น Viewer (Frontend) ---
 export function handleViewerConnection(ws, cameraId, wss) {
@@ -72,21 +100,48 @@ export function handleViewerConnection(ws, cameraId, wss) {
             const targetSession = cameraSessions.get(cameraId);
             if (targetSession && targetSession.sender && targetSession.sender.readyState === WebSocket.OPEN) {
                 try {
+                    const previousController = targetSession.currentController;
                     if (targetSession.currentController === null) {
-                        targetSession.currentController = { userId: userId, permission: permission, ws: ws };
+                        targetSession.currentController = { userId: userId, permission: permission, ws: ws, lastControlAt: Date.now() };
                         console.log(`Viewer with ID ${userId} is now controlling camera ${cameraId}`);
                         broadcastToClients();
                     } else if (targetSession.currentController.userId !== userId) {
                         if (permission !== 'admin') {
                             console.warn(`Viewer with ID ${userId} is trying to control camera ${cameraId} but is not the current controller.`);
-                            ws.send(JSON.stringify({ type: 'control_denied', reason: 'You are not the current controller of this camera.' }));
+                            sendControlFeedback(ws, {
+                                type: 'control_feedback',
+                                success: false,
+                                event: 'control_denied',
+                                reason: 'การควบคุมกล้องนี้ยังไม่ว่าง',
+                                cameraId
+                            });
                             return;
                         } else {
                             console.log(`Viewer with ID ${userId} is overriding control of camera ${cameraId} as admin.`);
-                            targetSession.currentController = { userId: userId, permission: permission, ws: ws };
+                            targetSession.currentController = { userId: userId, permission: permission, ws: ws, lastControlAt: Date.now() };
                             broadcastToClients();
+
+                            if (previousController?.ws && previousController.ws.readyState === WebSocket.OPEN) {
+                                sendControlFeedback(previousController.ws, {
+                                    type: 'control_feedback',
+                                    success: false,
+                                    event: 'control_taken_over',
+                                    reason: `${ws.viewerData?.username || 'ผู้ดูแล'} แย่งการควบคุมกล้องนี้`,
+                                    cameraId
+                                });
+                            }
                         }
+                    } else {
+                        targetSession.currentController.lastControlAt = Date.now();
                     }
+
+                    sendControlFeedback(ws, {
+                        type: 'control_feedback',
+                        success: true,
+                        event: 'control_sent',
+                        message: 'คำสั่งควบคุมถูกส่งแล้ว',
+                        cameraId
+                    });
 
                     targetSession.sender.send(JSON.stringify(msg));
                 } catch (e) {
