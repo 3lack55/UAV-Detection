@@ -14,6 +14,11 @@ export default function SystemControl() {
     const [roleFilter, setRoleFilter] = useState("all");
     const [stats, setStats] = useState({ total: 0, admin: 0, banned: 0 });
 
+    {/* CameraList */ }
+    const [cameraSearch, setCameraSearch] = useState("");
+    const [cameraStatusFilter, setCameraStatusFilter] = useState("all");
+    const [cameraStats, setCameraStats] = useState({ total: 0, active: 0, maintenance: 0 });
+
     const { statusUpdate } = useWebSocket();
     const [detectingCameras, setDetectingCameras] = useState([]);
     const [alertMessage, setAlertMessage] = useState('');
@@ -170,6 +175,52 @@ export default function SystemControl() {
                                 </div>
                             </div>
                         )}
+
+                        {activeTab === "camera" && (
+                            <div className="hidden lg:block lg:flex-grow">
+                                {/* Stats */}
+                                <div className="ul-stats">
+                                    <div className="ul-stat">
+                                        <div className="ul-stat-label">ทั้งหมด</div>
+                                        <div className="ul-stat-val">{cameraStats.total}</div>
+                                    </div>
+                                    <div className="ul-stat">
+                                        <div className="ul-stat-label">Active</div>
+                                        <div className="ul-stat-val">{cameraStats.active}</div>
+                                    </div>
+                                    <div className="ul-stat">
+                                        <div className="ul-stat-label">Maintenance</div>
+                                        <div className="ul-stat-val">{cameraStats.maintenance}</div>
+                                    </div>
+                                </div>
+
+                                {/* Toolbar */}
+                                <div className="ul-toolbar">
+                                    <div className="ul-search">
+                                        <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                                            <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+                                            <path d="M10 10L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                                        </svg>
+                                        <input
+                                            type="text"
+                                            placeholder="ค้นหาชื่อกล้อง..."
+                                            value={cameraSearch}
+                                            onChange={e => setCameraSearch(e.target.value)}
+                                        />
+                                    </div>
+                                    <select
+                                        className="ul-filter"
+                                        value={cameraStatusFilter}
+                                        onChange={e => setCameraStatusFilter(e.target.value)}
+                                    >
+                                        <option value="all">ทุกสถานะ</option>
+                                        <option value="active">Active</option>
+                                        <option value="maintenance">Maintenance</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -220,7 +271,13 @@ export default function SystemControl() {
                         )}
 
                         {activeTab === "camera" && (
-                            <CameraList />
+                            <CameraList
+                                search={cameraSearch}
+                                setSearch={setCameraSearch}
+                                statusFilter={cameraStatusFilter}
+                                setStatusFilter={setCameraStatusFilter}
+                                onStatsUpdate={setCameraStats}
+                            />
                         )}
                     </div>
 

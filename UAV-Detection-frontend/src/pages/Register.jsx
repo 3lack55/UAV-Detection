@@ -271,10 +271,6 @@ export default function Register() {
     return (
             <div className="register-bg">
                 <DroneCanvas />
-                <div className="blob-r blob-r1" />
-                <div className="blob-r blob-r2" />
-                <div className="blob-r blob-r3" />
-
                 <div className={`register-card ${mounted ? "mounted" : ""}`}>
                     {/* Logo */}
                     <div className="logo-ring-r">

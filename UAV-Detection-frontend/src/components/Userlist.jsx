@@ -1,10 +1,13 @@
 import { useState, useEffect, useMemo } from "react"
+import { Loader2, ChevronDown } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useWebSocket } from "../context/WebsocketContext";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
 const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
+
+const PAGE_SIZE = 15;
 
 const ROLE_BADGE = {
     admin: { label: "admin", className: "badge-admin" },
@@ -96,6 +99,7 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
     const [profileUser, setProfileUser] = useState(null);
     const [confirmModal, setConfirmModal] = useState(null);
     const [toastMsg, setToastMsg] = useState(null);
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
     const apiBase = `${PROTOCOL}://${HOST}:${HOST_PORT}`;
 
@@ -157,6 +161,13 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
             return matchSearch && matchRole;
         });
     }, [users, search, roleFilter]);
+
+    useEffect(() => {
+        setVisibleCount(PAGE_SIZE);
+    }, [search, roleFilter, users.length]);
+
+    const visibleUsers = filtered.filter(u => u.deleted !== 1).slice(0, visibleCount);
+    const hasMoreUsers = filtered.filter(u => u.deleted !== 1).length > visibleCount;
 
     const stats = useMemo(() => ({
         total: users.filter(u => u.deleted !== 1).length,
@@ -258,7 +269,8 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
 
     if (loading) {
         return (
-            <div className="ul-loading">
+            <div className="ul-loading flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                 <p>กำลังโหลด...</p>
             </div>
         );
@@ -320,16 +332,18 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                 </div>
 
                 {/* User list */}
-                {filtered.length === 0 ? (
+                {users.filter(u => u.deleted !== 1).length === 0 ? (
+                    <div className="ul-empty">ยังไม่มีผู้ใช้ในระบบ</div>
+                ) : filtered.length === 0 ? (
                     <div className="ul-empty">ไม่พบผู้ใช้ที่ตรงกับการค้นหา</div>
                 ) : (
-                    filtered.map((u) => {
-                        if (u.deleted) return;
+                    visibleUsers.map((u) => {
                         const imgPath = u.profile_image
                             ? `${apiBase}/uploads/user_profile/${u.profile_image}`
                             : null;
                         const avatarStyle = getAvatarColor(u.role);
                         const isBanned = u.role === "banned";
+                        const isSelf = String(u.user_id) === String(user?.user_id);
                         return (
                             <div key={u.user_id} className={`ul-card ${isBanned ? "is-banned" : ""}`}>
                                 {imgPath ? (
@@ -341,7 +355,14 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                                 )}
 
                                 <div className="ul-info">
-                                    <div className="ul-username">{u.username}</div>
+                                    <div className="ul-username">
+                                        {u.username}
+                                        {isSelf && (
+                                            <span className="ml-2 text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded px-1.5 py-0.5 align-middle">
+                                                คุณ
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="ul-meta">
                                         <span className="ul-uid">#{u.user_id}</span>
                                         <span className={`badge ${ROLE_BADGE[u.role]?.className || "badge-user"}`}>
@@ -371,10 +392,10 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                                     {/* เปลี่ยน Role */}
                                     <button
                                         className="ul-btn"
-                                        title={u.role === "admin" ? "เปลี่ยนเป็น User" : "เปลี่ยนเป็น Admin"}
+                                        title={isSelf ? "ไม่สามารถเปลี่ยน Role ของตัวเองได้" : (u.role === "admin" ? "เปลี่ยนเป็น User" : "เปลี่ยนเป็น Admin")}
                                         onClick={() => handleChangeRole(u)}
-                                        disabled={isBanned}
-                                        style={isBanned ? { opacity: 0.3, cursor: "not-allowed" } : {}}
+                                        disabled={isBanned || isSelf}
+                                        style={(isBanned || isSelf) ? { opacity: 0.3, cursor: "not-allowed" } : {}}
                                     >
                                         <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                                             <path d="M7.5 1L9.5 4H5.5L7.5 1Z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
@@ -388,8 +409,10 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                                     {/* Suspend / Unban */}
                                     <button
                                         className={`ul-btn ${isBanned ? "btn-unban" : "btn-warn"}`}
-                                        title={isBanned ? "ปลด Ban" : "Suspend"}
+                                        title={isSelf ? "ไม่สามารถ Suspend ตัวเองได้" : (isBanned ? "ปลด Ban" : "Suspend")}
                                         onClick={() => handleBanToggle(u)}
+                                        disabled={isSelf}
+                                        style={isSelf ? { opacity: 0.3, cursor: "not-allowed" } : {}}
                                     >
                                         {isBanned ? (
                                             <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -406,8 +429,10 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                                     {/* ลบ */}
                                     <button
                                         className="ul-btn btn-danger"
-                                        title="ลบ User"
+                                        title={isSelf ? "ไม่สามารถลบบัญชีตัวเองได้" : "ลบ User"}
                                         onClick={() => handleDelete(u)}
+                                        disabled={isSelf}
+                                        style={isSelf ? { opacity: 0.3, cursor: "not-allowed" } : {}}
                                     >
                                         <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
                                             <path d="M3 4H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -419,6 +444,23 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                             </div>
                         );
                     })
+                )}
+
+                {filtered.length > 0 && (
+                    <div className="flex flex-col items-center gap-1.5 pt-2">
+                        {hasMoreUsers && (
+                            <button
+                                onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-slate-700 rounded-lg px-3 py-1.5 transition-colors"
+                            >
+                                <ChevronDown size={13} />
+                                โหลดเพิ่มเติม
+                            </button>
+                        )}
+                        <span className="text-[10px] text-slate-600">
+                            แสดง {visibleUsers.length} จาก {filtered.filter(u => u.deleted !== 1).length} รายการ
+                        </span>
+                    </div>
                 )}
             </div>
 

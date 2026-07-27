@@ -248,7 +248,7 @@ export default function Dashboard() {
               <div className="w-full h-[32px] flex items-center justify-between gap-2 px-2 bg-slate-800/80 border-b border-black backdrop-blur-[2px]">
                 <div className="flex items-center gap-2">
                   <Camera className="w-4 h-4 text-green-400 inline-block mr-1" />
-                  <h6 className="text-sm font-mono w-[300px] truncate">Camera: {cameraList.find(cam => cam.camera_id === cameraID)?.camera_name || cameraID}</h6>
+                  <h6 className="text-sm w-[300px] truncate">Camera: {cameraList.find(cam => cam.camera_id === cameraID)?.camera_name || cameraID}</h6>
                 </div>
                 <div className="flex items-center gap-2">
                   <img src="/expand.png" alt="expand" className={`w-6 p-1 opacity-60 cursor-pointer hover:opacity-100 transition-all duration-300 ${cameraExpanded ? 'rotate-180' : ''} ${isNativeFullscreen ? 'hidden' : ''}`} onClick={handleCameraExpand} title={`${cameraExpanded ? 'Collapse' : 'Expand'}`} />
@@ -354,7 +354,7 @@ export default function Dashboard() {
                           </div>
                           
                           <div>
-                            <p className="text-xs text-slate-300 font-mono ml-[22px]">{cam.heading}° ({DIRECTION_LABELS(cam.heading)})</p>
+                            <p className="text-xs text-slate-300 ml-[22px]">{cam.heading}° ({DIRECTION_LABELS(cam.heading)})</p>
                           </div>
                         </div>
 

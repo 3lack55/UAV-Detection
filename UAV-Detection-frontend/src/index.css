@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Kanit', sans-serif, system-ui, Avenir, Helvetica, Arial;
   font-weight: 400;
 
   color: rgba(255, 255, 255, 0.87);
@@ -29,9 +29,18 @@
   }
 }
 
-.custom-scrollbar::-webkit-scrollbar { width: 3px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
 
 @keyframes slideInUp {
   from {
@@ -106,14 +115,16 @@
   border-radius: 8px !important;
 }
 
-.leaflet-control-zoom-in, .leaflet-control-zoom-out {
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
   background: rgba(15, 23, 42, 0.5) !important;
   color: #f8fafc !important;
   border: 1px solid #334155;
   cursor: pointer;
 }
 
-.leaflet-control-zoom-in:hover, .leaflet-control-zoom-out:hover {
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
   background: rgba(61, 68, 83, 0.7) !important;
 }
 
@@ -121,6 +132,7 @@
 .tactical-popup {
   padding: 18px 12px 6px 12px;
   min-width: 250px;
+  font-family: 'Kanit';
 }
 
 .popup-header {
@@ -140,7 +152,6 @@
 .coord-row {
   display: flex;
   gap: 8px;
-  font-family: monospace;
 }
 
 .coord {
@@ -303,7 +314,6 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  font-family: inherit;
 }
 
 .cl-header {
@@ -316,7 +326,6 @@
 .cl-header-title {
   font-size: 13px;
   color: #64748b;
-  font-family: ui-monospace, monospace;
   letter-spacing: 0.04em;
 }
 
@@ -333,7 +342,6 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  font-family: inherit;
   transition: all 0.15s;
 }
 
@@ -419,7 +427,6 @@
 
 .cl-uid {
   color: #475569;
-  font-family: ui-monospace, monospace;
   font-size: 12px;
 }
 
@@ -428,7 +435,6 @@
   align-items: center;
   gap: 4px;
   color: #475569;
-  font-family: ui-monospace, monospace;
   font-size: 11px;
 }
 
@@ -497,7 +503,6 @@
 .cl-loading p {
   font-size: 14px;
   color: #64748b;
-  font-family: ui-monospace, monospace;
 }
 
 .cl-error {
@@ -592,7 +597,6 @@
   font-size: 14px;
   padding: 0 12px;
   outline: none;
-  font-family: inherit;
   transition: border-color 0.15s;
 }
 
@@ -622,7 +626,6 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-family: inherit;
   transition: all 0.15s;
 }
 
@@ -723,7 +726,6 @@
   color: #94a3b8;
   font-size: 14px;
   cursor: pointer;
-  font-family: inherit;
   transition: all 0.15s;
 }
 
@@ -742,7 +744,6 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  font-family: inherit;
   transition: background 0.15s;
 }
 
@@ -796,7 +797,6 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  font-family: inherit;
 }
 
 /* User card */
@@ -870,7 +870,6 @@
 .ul-uid {
   font-size: 12px;
   color: #475569;
-  font-family: ui-monospace, monospace;
 }
 
 .ul-date {
@@ -980,7 +979,6 @@
 .ul-loading p {
   font-size: 14px;
   color: #64748b;
-  font-family: ui-monospace, monospace;
 }
 
 .ul-error {
@@ -1038,7 +1036,6 @@
   color: #94a3b8;
   font-size: 14px;
   cursor: pointer;
-  font-family: inherit;
   transition: all 0.15s;
 }
 
@@ -1055,7 +1052,6 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  font-family: inherit;
   transition: all 0.15s;
 }
 
@@ -1178,7 +1174,6 @@
 .profile-row-value {
   font-size: 13px;
   color: #94a3b8;
-  font-family: ui-monospace, monospace;
 }
 
 /* Toast */

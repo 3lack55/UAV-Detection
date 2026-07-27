@@ -356,7 +356,6 @@ export default function Account() {
                                     <MoveLeft className="w-5 h-5" />
                                 </button>
                             </Link>
-
                         </div>
                         <div>
                             <h1 className="text-5xl font-bold text-white mb-2">จัดการบัญชี</h1>
@@ -447,10 +446,10 @@ export default function Account() {
                         </div>
                     </div>
 
-                    <div className="flex flex-1 flex-grow bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-2xl border border-slate-700/50 p-6 shadow-xl hover:shadow-2xl hover:border-slate-600/50 transition-all duration-300 justify-center lg:overflow-y-auto lg:min-h-0 right-content-scroll">
+                    <div className="flex flex-1 flex-grow lg:bg-gradient-to-br lg:from-slate-800 lg:to-slate-800/50 rounded-2xl lg:border lg:border-slate-700/50 pt-4 lg:p-6 lg:shadow-xl lg:hover:shadow-2xl lg:hover:border-slate-600/50 transition-all duration-300 justify-center lg:overflow-y-auto lg:min-h-0 right-content-scroll">
                         {activeTab === "profile" && (
-                            <div className="lg:max-w-5xl w-full flex justify-center">
-                                <div className="w-full space-y-6">
+                            <div className="w-full max-w-xl mx-auto">
+                                <div className="space-y-6">
                                     {/* User ID (Read-only) */}
                                     <div className="group">
                                         <label className="flex items-center gap-2 text-sm font-semibold text-slate-300 mb-2">
@@ -472,7 +471,7 @@ export default function Account() {
                                                 })}
                                                 disabled={!editingProfile}
                                                 className={`w-full px-4 py-3 border rounded-xl transition-all duration-300
-                                            ${editingProfile ? "bg-slate-700 border-blue-500 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent shadow-lg shadow-blue-500/10" : "bg-slate-700/50 border-slate-600 text-slate-200 cursor-not-allowedhover:bg-slate-700/60"
+                                            ${editingProfile ? "bg-slate-700 border-blue-500 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent shadow-lg shadow-blue-500/10" : "bg-slate-700/50 border-slate-600 text-slate-200 cursor-not-allowed hover:bg-slate-700/60"
                                                     }`}
                                             />
                                             {editingProfile && (
@@ -538,7 +537,7 @@ export default function Account() {
                         )}
 
                         {activeTab === "password" && (
-                            <div className="lg:max-w-5xl  w-full">
+                            <div className="w-full max-w-xl mx-auto">
                                 <form onSubmit={handleChangePassword} className="space-y-6">
                                     {/* Current Password */}
                                     <div className="group">
@@ -685,7 +684,7 @@ export default function Account() {
                         )}
 
                         {activeTab === "image" && (
-                            <div className="lg:max-w-5xl w-full">
+                            <div className="w-full max-w-2xl mx-auto">
                                 <div className="space-y-8">
                                     {/* Current Profile Image */}
                                     <div>

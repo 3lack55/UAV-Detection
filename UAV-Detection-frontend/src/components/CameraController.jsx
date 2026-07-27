@@ -181,21 +181,21 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
           {active ? (
             hasControl ? (
               controllable ? (
-                <span className="text-[10px] font-mono bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
+                <span className="text-[10px] bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30 text-emerald-400 flex items-center gap-1">
                   การควบคุมพร้อมใช้งาน
                 </span>
               ) : (
-                <span className="text-[10px] font-mono bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/30 text-yellow-400 flex items-center gap-1">
+                <span className="text-[10px] bg-yellow-500/10 px-2 py-1 rounded border border-yellow-500/30 text-yellow-400 flex items-center gap-1">
                   การควบคุมถูกปิดใช้งาน
                 </span>
               )
             ) : (
-              <span className="text-[10px] font-mono bg-red-500/10 px-2 py-1 rounded border border-red-500/30 text-red-400 flex items-center gap-1">
+              <span className="text-[10px] bg-red-500/10 px-2 py-1 rounded border border-red-500/30 text-red-400 flex items-center gap-1">
                 <Lock className="w-3 h-3" /> ไม่ได้รับสิทธิ์ควบคุม
               </span>
             )
           ) : (
-            <span className="text-[10px] font-mono bg-slate-500/10 px-2 py-1 rounded border border-slate-500/30 text-slate-400 flex items-center gap-1">
+            <span className="text-[10px] bg-slate-500/10 px-2 py-1 rounded border border-slate-500/30 text-slate-400 flex items-center gap-1">
               <Lock className="w-3 h-3" /> <span>ไม่พร้อมใช้งาน</span>
             </span>
           )}

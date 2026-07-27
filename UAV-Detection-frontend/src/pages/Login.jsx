@@ -231,10 +231,6 @@ export default function Login() {
     return (
             <div className="login-bg">
                 <DroneCanvas />
-                <div className="blob blob-1" />
-                <div className="blob blob-2" />
-                <div className="blob blob-3" />
-
                 <div className={`login-card ${mounted ? "mounted" : ""}`}>
                     {/* Logo */}
                     <div className="logo-ring">

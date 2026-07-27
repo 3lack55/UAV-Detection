@@ -60,7 +60,7 @@ const createBaseIcon = (label = "CAM", status = "maintenance") => {
 };
 
 const createBasePopupContent = (base, live) => `
-    <div class="tactical-popup station-popup">
+    <div class="tactical-popup">
         <div class="popup-header" style="border-left: 4px solid ${COLORS[base.status]}; padding-left: 10px; margin-bottom: 12px;">
             <div style="font-size: 10px; color: #94a3b8; letter-spacing: 2px; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">
                 ${base.type || 'ฐานตรวจการณ์'}
@@ -73,17 +73,16 @@ const createBasePopupContent = (base, live) => `
 
         <div class="popup-body" style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
             <div class="status-row" style="margin-bottom: 8px; font-size: 11px; padding-bottom: 2px;">
-                <span style="color: #64748b;">ตำแหน่ง:</span>
+                <span style="color: #64748b; font-weight: bold">ตำแหน่ง:</span>
             </div>
             
-            <div class="coord-row" style="display: flex; justify-content: space-between; font-family: 'monospace'; font-size: 11px;">
-                <div style="color: #cbd5e1;"><span>LAT</span> ${base.lat.toFixed(6)}</div>
-                <div style="color: #64748b; padding: 0 4px;">|</div>
-                <div style="color: #cbd5e1; "><span>LNG</span> ${base.lng.toFixed(6)}</div>
+            <div class="coord-row" style="display: flex; justify-content: space-between; font-size: 11px;">
+                <div style="color: #cbd5e1; ">พิกัด: </div>
+                <div style="color: #cbd5e1; font-family: 'monospace'; font-style: italic">${base.lat.toFixed(6)}, ${base.lng.toFixed(6)}</div>
             </div>
 
             <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
-                <span style="font-size: 10px; color: #64748b; font-weight: bold;">INSTALL FACE (ทิศติดตั้ง):</span>
+                <span style="color: #cbd5e1; font-size: 11px;">ทิศติดตั้ง:</span>
                 <span style="font-size: 12px; color: ${COLORS[base.status]}; font-weight: 900; font-family: monospace;">${live ? live.installFace : base.heading}°</span>
             </div>
 

@@ -1,11 +1,16 @@
-import { useEffect, useState } from "react";
-import { Camera, Plus, Pencil, Users, X, MapPin } from "lucide-react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { Camera, Plus, Pencil, Users, X, MapPin, Loader2, ChevronDown, AlertTriangle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useWebSocket } from "../context/WebsocketContext";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
 const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
+
+const PAGE_SIZE = 15;
+// Names that mean "this camera hasn't been properly configured yet"
+const INCOMPLETE_NAME_VALUES = ["", "unknow", "unknown", "ยังไม่ตั้งชื่อ"];
+const isIncompleteName = (name) => INCOMPLETE_NAME_VALUES.includes(String(name || "").trim().toLowerCase());
 
 const PERMISSION_BADGE = {
     admin: { label: "admin", className: "badge-admin" },
@@ -162,25 +167,29 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
 
                 <div className="cl-form-group">
                     <label className="cl-label">ผู้ใช้งาน</label>
-                    <div className="border rounded-md mb-2 max-h-32 overflow-y-auto min-h-[183px] custom-scrollbar border-slate-700/50">
-                        { users.filter(u => u.deleted !== 1).map(u => {
+                    <div className="border rounded-md mb-2 max-h-56 overflow-y-auto min-h-[120px] custom-scrollbar border-slate-700/50">
+                        {users.filter(u => u.deleted !== 1).map(u => {
                             const currentPermission = getUserPermissionForCamera(u.user_id);
                             return (
-                            <div key={u.user_id} className="py-2 px-3 border-b border-slate-600/50 hover:bg-slate-700/30 flex items-center justify-between gap-2 text-sm">
-                                <div>
-                                    <h2 className="mb-1">{u.username}</h2> 
-                                    <p className="text-slate-400">(User ID: {u.user_id})</p>
+                                <div
+                                    key={u.user_id}
+                                    className="py-2 px-3 border-b border-slate-600/50 hover:bg-slate-700/30 flex items-center justify-between gap-2 text-sm"
+                                    onClick={(() => setSelectedUser(u.user_id))}
+                                >
+                                    <div>
+                                        <h2 className="mb-1">{u.username}</h2>
+                                        <p className="text-slate-400">(User ID: {u.user_id})</p>
+                                    </div>
+                                    <div>
+                                        {currentPermission ? (
+                                            <span className={`badge badge-${currentPermission}`}>
+                                                {PERMISSION_BADGE[currentPermission].label}
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-500 text-xs font-medium">ยังไม่กำหนด</span>
+                                        )}
+                                    </div>
                                 </div>
-                                <div>
-                                    {currentPermission ? (
-                                        <span className={`badge badge-${currentPermission}`}>
-                                            {PERMISSION_BADGE[currentPermission].label}
-                                        </span>
-                                    ) : (
-                                        <span className="text-slate-500 text-xs font-medium">ยังไม่กำหนด</span>
-                                    )}
-                                </div>
-                            </div>
                             );
                         })
                         }
@@ -194,7 +203,7 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
                         {
                             users.filter(u => u.deleted !== 1).map(u => {
                                 const currentPermission = getUserPermissionForCamera(u.user_id);
-                                const permissionText = currentPermission 
+                                const permissionText = currentPermission
                                     ? ` - ${PERMISSION_BADGE[currentPermission].label}`
                                     : " - ยังไม่กำหนด";
                                 return (
@@ -222,8 +231,8 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
                         ))}
                     </div>
                     <p className="cl-permission-hint">
-                        {permission === "admin" && "จัดการกล้องและสิทธิ์ของผู้ใช้อื่นได้เต็มสิทธิ์"}
-                        {permission === "operator" && "ดูสตรีมและควบคุมกล้องได้ (ไม่รวมการตั้งค่า)"}
+                        {permission === "admin" && "ดดูสตรีม และแย่งการควบคุมกล้องจากผู้ที่กำลังควบคุมอยู่ได้"}
+                        {permission === "operator" && "ดูสตรีม และควบคุมกล้องได้"}
                         {permission === "viewer" && "ดูสตรีมจากกล้องได้เท่านั้น"}
                         {permission === "unassigned" && "ยังไม่กำหนดสิทธิ์สำหรับผู้ใช้คนนี้"}
                     </p>
@@ -244,7 +253,7 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
     );
 }
 
-export default function CameraList() {
+export default function CameraList({ search = "", setSearch = () => { }, statusFilter = "all", setStatusFilter = () => { }, onStatsUpdate = () => { } }) {
     const { user } = useAuth();
     const { systemEvent } = useWebSocket();
     const [cameras, setCameras] = useState([]);
@@ -252,10 +261,11 @@ export default function CameraList() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const [formModal, setFormModal] = useState(null); // { initial }
-    const [assignModal, setAssignModal] = useState(null); // camera
+    const [formModal, setFormModal] = useState(null);
+    const [assignModal, setAssignModal] = useState(null);
     const [toastMsg, setToastMsg] = useState(null);
     const [allPermissions, setAllPermissions] = useState([]);
+    const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
     const apiBase = `${PROTOCOL}://${HOST}:${HOST_PORT}`;
     const authHeaders = {
@@ -267,6 +277,18 @@ export default function CameraList() {
         setToastMsg({ msg, type });
         setTimeout(() => setToastMsg(null), 3000);
     };
+
+    const fetchPermissions = useCallback(async () => {
+        try {
+            const respond = await fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getAllPermissions`, {
+                headers: authHeaders,
+            });
+            const permissions = await respond.json();
+            setAllPermissions(permissions.data || []);
+        } catch (err) {
+            console.log("Error fetching camera permissions:", err);
+        }
+    }, [user?.token]);
 
     useEffect(() => {
         const fetchAllCamera = async () => {
@@ -293,12 +315,12 @@ export default function CameraList() {
                 const data = await respond.json();
                 if (data.success) setAllUsers(data.data);
             } catch (err) {
-                // ไม่ critical ถ้าโหลด user list ไม่ได้
             }
         };
 
         fetchAllCamera();
         fetchAllUsers();
+        fetchPermissions();
     }, [user?.token]);
 
     useEffect(() => {
@@ -323,25 +345,15 @@ export default function CameraList() {
                 .then(data => {
                     if (data.success) setAllUsers(data.data);
                 })
-                .catch(() => {});
+                .catch(() => { });
         }
+
+        fetchPermissions();
     }, [systemEvent]);
 
     useEffect(() => {
         if (!assignModal) return;
-
-        const fetchPermission = async () => {
-            try {
-                const respond = await fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getAllPermissions`, {
-                    headers: authHeaders,
-                });
-                const permissions = await respond.json();
-                setAllPermissions(permissions.data || []);
-            } catch (err) {
-                console.log("Error fetching camera permissions:", err);
-            }
-        };
-        fetchPermission();
+        fetchPermissions();
     }, [assignModal]);
 
     // --- Add / Edit ---
@@ -395,6 +407,7 @@ export default function CameraList() {
                 const u = allUsers.find(u => String(u.user_id) === String(userId));
                 showToast(`Assign "${u?.username || "ผู้ใช้"}" เป็น ${PERMISSION_BADGE[permission].label} แล้ว`);
                 setAssignModal(null);
+                fetchPermissions();
             } else {
                 showToast("Assign ไม่สำเร็จ", "error");
             }
@@ -403,9 +416,49 @@ export default function CameraList() {
         }
     };
 
+    const filteredCameras = useMemo(() => {
+        return cameras.filter(cam => {
+            const matchSearch = (cam.camera_name || "").toLowerCase().includes(search.toLowerCase());
+            const matchStatus = statusFilter === "all" || cam.status === statusFilter;
+            return matchSearch && matchStatus;
+        });
+    }, [cameras, search, statusFilter]);
+
+    const stats = useMemo(() => ({
+        total: cameras.length,
+        active: cameras.filter(c => c.status === "active").length,
+        maintenance: cameras.filter(c => c.status === "maintenance").length,
+    }), [cameras]);
+
+    useEffect(() => {
+        onStatsUpdate(stats);
+    }, [stats]);
+
+    // Reset to the first page whenever search/filter/data changes
+    useEffect(() => {
+        setVisibleCount(PAGE_SIZE);
+    }, [search, statusFilter, cameras.length]);
+
+    const visibleCameras = filteredCameras.slice(0, visibleCount);
+    const hasMoreCameras = filteredCameras.length > visibleCount;
+
+    const getAssignedCount = (cameraId) => {
+        return allPermissions.filter(p => {
+            const user = allUsers.find(u => u.user_id === p.user_id);
+
+            return (
+                p.camera_id === cameraId &&
+                p.permission_level &&
+                p.permission_level !== "unassigned" &&
+                user && user.deleted !== 1
+            );
+        }).length;
+    };
+
     if (loading) {
         return (
-            <div className="cl-loading">
+            <div className="cl-loading flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
                 <p>กำลังโหลด...</p>
             </div>
         );
@@ -422,6 +475,49 @@ export default function CameraList() {
     return (
         <>
             <div className="cl-wrap">
+                {/* Mobile-only stats + search + filter (desktop shows the equivalent in the page header) */}
+                <div className="lg:hidden">
+                    <div className="ul-stats">
+                        <div className="ul-stat">
+                            <div className="ul-stat-label">ทั้งหมด</div>
+                            <div className="ul-stat-val">{stats.total}</div>
+                        </div>
+                        <div className="ul-stat">
+                            <div className="ul-stat-label">Active</div>
+                            <div className="ul-stat-val">{stats.active}</div>
+                        </div>
+                        <div className="ul-stat">
+                            <div className="ul-stat-label">Maintenance</div>
+                            <div className="ul-stat-val">{stats.maintenance}</div>
+                        </div>
+                    </div>
+
+                    <div className="ul-toolbar">
+                        <div className="ul-search">
+                            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+                                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+                                <path d="M10 10L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                            </svg>
+                            <input
+                                type="text"
+                                placeholder="ค้นหาชื่อกล้อง..."
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                            />
+                        </div>
+                        <select
+                            className="ul-filter"
+                            value={statusFilter}
+                            onChange={e => setStatusFilter(e.target.value)}
+                        >
+                            <option value="all">ทุกสถานะ</option>
+                            <option value="active">Active</option>
+                            <option value="maintenance">Maintenance</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div className="cl-header">
                     <span className="cl-header-title">กล้องทั้งหมด ({cameras.length})</span>
                     <button className="cl-add-btn" onClick={() => setFormModal({ initial: null })}>
@@ -431,47 +527,85 @@ export default function CameraList() {
 
                 {cameras.length === 0 ? (
                     <div className="cl-empty">ยังไม่มีกล้องในระบบ</div>
+                ) : filteredCameras.length === 0 ? (
+                    <div className="cl-empty">ไม่พบกล้องที่ตรงกับการค้นหา</div>
                 ) : (
                     <div className="cl-list">
-                        {cameras.map((cam) => (
-                            <div className="cl-card" key={cam.camera_id}>
-                                <div className="cl-icon-wrap">
-                                    <Camera className="cl-cam-icon" />
-                                    <span className={`cl-status-pip pip-${cam.status}`} />
-                                </div>
+                        {visibleCameras.map((cam) => {
+                            const incompleteName = isIncompleteName(cam.camera_name);
+                            const assignedCount = getAssignedCount(cam.camera_id);
+                            return (
+                                <div className="cl-card" key={cam.camera_id}>
+                                    <div className="cl-icon-wrap">
+                                        <Camera className="cl-cam-icon" />
+                                        <span className={`cl-status-pip pip-${cam.status}`} />
+                                    </div>
 
-                                <div className="cl-info">
-                                    <h2 className="cl-name">{cam.camera_name}</h2>
-                                    <div className="cl-meta">
-                                        <span className="cl-uid">#{cam.camera_id}</span>
-                                        <span className="cl-coords">
-                                            <MapPin size={11} />
-                                            {cam.latitude}, {cam.longitude}
-                                        </span>
-                                        <span className={`cl-status-text status-${cam.status}`}>
-                                            {cam.status === "active" ? "Active" : cam.status === "maintenance" ? "Maintenance" : "Inactive"}
-                                        </span>
+                                    <div className="cl-info">
+                                        <h2 className="cl-name flex items-center gap-2 flex-wrap">
+                                            {incompleteName ? "ยังไม่ตั้งชื่อ" : cam.camera_name}
+                                            {incompleteName && (
+                                                <span
+                                                    className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-400/10 border border-amber-500/30 rounded px-1.5 py-0.5"
+                                                    title="กล้องนี้ยังตั้งค่าไม่ครบ กรุณากดแก้ไขข้อมูลเพื่อตั้งชื่อ"
+                                                >
+                                                    <AlertTriangle size={10} /> ต้องตั้งค่า
+                                                </span>
+                                            )}
+                                        </h2>
+                                        <div className="cl-meta">
+                                            <span className="cl-uid">#{cam.camera_id}</span>
+                                            <span className="cl-coords">
+                                                <MapPin size={11} />
+                                                {parseFloat(cam.latitude).toFixed(2)}, {parseFloat(cam.longitude).toFixed(2)}
+                                            </span>
+                                            <span className={`cl-status-text status-${cam.status}`}>
+                                                {cam.status === "active" ? "Active" : cam.status === "maintenance" ? "Maintenance" : "Inactive"}
+                                            </span>
+                                            {assignedCount > 0 && (
+                                                <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                                                    <Users size={10} /> {assignedCount} ผู้ใช้
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="cl-actions">
+                                        <button
+                                            className="cl-btn"
+                                            title="Assign ผู้ใช้"
+                                            onClick={() => setAssignModal(cam)}
+                                        >
+                                            <Users size={16} />
+                                        </button>
+                                        <button
+                                            className="cl-btn"
+                                            title="แก้ไขข้อมูล"
+                                            onClick={() => setFormModal({ initial: cam })}
+                                        >
+                                            <Pencil size={16} />
+                                        </button>
                                     </div>
                                 </div>
+                            );
+                        })}
+                    </div>
+                )}
 
-                                <div className="cl-actions">
-                                    <button
-                                        className="cl-btn"
-                                        title="Assign ผู้ใช้"
-                                        onClick={() => setAssignModal(cam)}
-                                    >
-                                        <Users size={16} />
-                                    </button>
-                                    <button
-                                        className="cl-btn"
-                                        title="แก้ไขข้อมูล"
-                                        onClick={() => setFormModal({ initial: cam })}
-                                    >
-                                        <Pencil size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                {filteredCameras.length > 0 && (
+                    <div className="flex flex-col items-center gap-1.5 pt-3">
+                        {hasMoreCameras && (
+                            <button
+                                onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-slate-700 rounded-lg px-3 py-1.5 transition-colors"
+                            >
+                                <ChevronDown size={13} />
+                                โหลดเพิ่มเติม
+                            </button>
+                        )}
+                        <span className="text-[10px] text-slate-600">
+                            แสดง {visibleCameras.length} จาก {filteredCameras.length} รายการ
+                        </span>
                     </div>
                 )}
             </div>
