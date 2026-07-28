@@ -1,14 +1,14 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
-import { Camera, Plus, Pencil, Users, X, MapPin, Loader2, ChevronDown, AlertTriangle } from "lucide-react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { Camera, Plus, Pencil, Users, X, MapPin, Loader2, ChevronDown, AlertTriangle, Trash2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useWebSocket } from "../context/WebsocketContext";
+import { useLeafletLoader } from "./BoboMap";
 
 const HOST = import.meta.env.VITE_API_HOST || "localhost";
 const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
 const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
 
 const PAGE_SIZE = 15;
-// Names that mean "this camera hasn't been properly configured yet"
 const INCOMPLETE_NAME_VALUES = ["", "unknow", "unknown", "ยังไม่ตั้งชื่อ"];
 const isIncompleteName = (name) => INCOMPLETE_NAME_VALUES.includes(String(name || "").trim().toLowerCase());
 
@@ -26,6 +26,74 @@ const EMPTY_FORM = {
     longitude: "",
     status: "active",
 };
+
+const DEFAULT_MAP_CENTER = [14.9844, 102.1189];
+
+function LocationPickerMap({ lat, lng, onPick }) {
+    const mapContainerRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+    const markerRef = useRef(null);
+    const mapReady = useLeafletLoader();
+
+    useEffect(() => {
+        if (!mapReady || !mapContainerRef.current || mapInstanceRef.current || !window.L) return;
+
+        const parsedLat = parseFloat(lat);
+        const parsedLng = parseFloat(lng);
+        const initialCenter = (!isNaN(parsedLat) && !isNaN(parsedLng)) ? [parsedLat, parsedLng] : DEFAULT_MAP_CENTER;
+
+        const map = window.L.map(mapContainerRef.current, {
+            center: initialCenter,
+            zoom: 16,
+        });
+        mapInstanceRef.current = map;
+
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19,
+        }).addTo(map);
+
+        const marker = window.L.marker(initialCenter, { draggable: true }).addTo(map);
+        markerRef.current = marker;
+
+        marker.on('dragend', () => {
+            const pos = marker.getLatLng();
+            onPick(pos.lat.toFixed(8), pos.lng.toFixed(8));
+        });
+
+        map.on('click', (e) => {
+            marker.setLatLng(e.latlng);
+            onPick(e.latlng.lat.toFixed(8), e.latlng.lng.toFixed(8));
+        });
+
+        setTimeout(() => map.invalidateSize(), 150);
+
+        return () => {
+            map.remove();
+            mapInstanceRef.current = null;
+            markerRef.current = null;
+        };
+    }, [mapReady]);
+
+    useEffect(() => {
+        if (!markerRef.current) return;
+        const parsedLat = parseFloat(lat);
+        const parsedLng = parseFloat(lng);
+        if (isNaN(parsedLat) || isNaN(parsedLng)) return;
+        const current = markerRef.current.getLatLng();
+        if (current.lat.toFixed(6) !== parsedLat.toFixed(6) || current.lng.toFixed(6) !== parsedLng.toFixed(6)) {
+            markerRef.current.setLatLng([parsedLat, parsedLng]);
+        }
+    }, [lat, lng]);
+
+    return (
+        <div className="cl-form-group">
+            <label className="cl-label">ตำแหน่งบนแผนที่ (คลิกหรือลากหมุดเพื่อกำหนดพิกัด)</label>
+            <div ref={mapContainerRef} className="w-full h-56 rounded-md overflow-hidden border border-slate-700/50" />
+            {!mapReady && <p className="text-xs text-slate-500 mt-1">กำลังโหลดแผนที่...</p>}
+        </div>
+    );
+}
 
 function CameraFormModal({ open, initial, onClose, onSave }) {
     const [form, setForm] = useState(EMPTY_FORM);
@@ -65,6 +133,14 @@ function CameraFormModal({ open, initial, onClose, onSave }) {
                         placeholder="เช่น สนามกีฬากลาง มทร."
                     />
                 </div>
+
+                <LocationPickerMap
+                    lat={form.latitude}
+                    lng={form.longitude}
+                    onPick={(newLat, newLng) => {
+                        setForm(prev => ({ ...prev, latitude: newLat, longitude: newLng }));
+                    }}
+                />
 
                 <div className="cl-form-row">
                     <div className="cl-form-group">
@@ -171,11 +247,7 @@ function AssignModal({ open, camera, users, onClose, onAssign, allPermissions })
                         {users.filter(u => u.deleted !== 1).map(u => {
                             const currentPermission = getUserPermissionForCamera(u.user_id);
                             return (
-                                <div
-                                    key={u.user_id}
-                                    className="py-2 px-3 border-b border-slate-600/50 hover:bg-slate-700/30 flex items-center justify-between gap-2 text-sm"
-                                    onClick={(() => setSelectedUser(u.user_id))}
-                                >
+                                <div key={u.user_id} className="py-2 px-3 border-b border-slate-600/50 hover:bg-slate-700/30 flex items-center justify-between gap-2 text-sm" onClick={(() => setSelectedUser(u.user_id))}>
                                     <div>
                                         <h2 className="mb-1">{u.username}</h2>
                                         <p className="text-slate-400">(User ID: {u.user_id})</p>
@@ -263,6 +335,7 @@ export default function CameraList({ search = "", setSearch = () => { }, statusF
 
     const [formModal, setFormModal] = useState(null);
     const [assignModal, setAssignModal] = useState(null);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
     const [toastMsg, setToastMsg] = useState(null);
     const [allPermissions, setAllPermissions] = useState([]);
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -296,7 +369,7 @@ export default function CameraList({ search = "", setSearch = () => { }, statusF
                 const respond = await fetch(`${apiBase}/api/camera/getAllCameras`);
                 const data = await respond.json();
                 if (data.success) {
-                    setCameras(data.data);
+                    setCameras(data.data.filter(d => d.deleted !== 1));
                 } else {
                     setError("ไม่สามารถโหลดข้อมูลกล้องได้");
                 }
@@ -315,6 +388,7 @@ export default function CameraList({ search = "", setSearch = () => { }, statusF
                 const data = await respond.json();
                 if (data.success) setAllUsers(data.data);
             } catch (err) {
+                // ไม่ critical ถ้าโหลด user list ไม่ได้
             }
         };
 
@@ -332,7 +406,7 @@ export default function CameraList({ search = "", setSearch = () => { }, statusF
         fetch(`${apiBase}/api/camera/getAllCameras`)
             .then(res => res.json())
             .then(data => {
-                if (data.success) setCameras(data.data);
+                if (data.success) setCameras(data.data.filter(d => d.deleted !== 1));
             })
             .catch(() => setError("เกิดข้อผิดพลาดในการเชื่อมต่อ"))
             .finally(() => setLoading(false));
@@ -410,6 +484,26 @@ export default function CameraList({ search = "", setSearch = () => { }, statusF
                 fetchPermissions();
             } else {
                 showToast("Assign ไม่สำเร็จ", "error");
+            }
+        } catch (err) {
+            showToast("เกิดข้อผิดพลาด", "error");
+        }
+    };
+
+    // --- Delete ---
+    const handleDeleteCamera = async (camera) => {
+        try {
+            const res = await fetch(`${apiBase}/api/camera/deleteCamera/${camera.camera_id}`, {
+                method: "DELETE",
+                headers: authHeaders,
+            });
+            const result = await res.json();
+            if (result.success) {
+                setCameras(prev => prev.filter(c => c.camera_id !== camera.camera_id));
+                showToast(`ลบกล้อง "${camera.camera_name || "ที่ยังไม่ตั้งชื่อ"}" แล้ว`, "error");
+                setDeleteConfirm(null);
+            } else {
+                showToast(result.message || "ลบไม่สำเร็จ", "error");
             }
         } catch (err) {
             showToast("เกิดข้อผิดพลาด", "error");
@@ -585,6 +679,13 @@ export default function CameraList({ search = "", setSearch = () => { }, statusF
                                         >
                                             <Pencil size={16} />
                                         </button>
+                                        <button
+                                            className="cl-btn"
+                                            title="ลบกล้อง"
+                                            onClick={() => setDeleteConfirm(cam)}
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                     </div>
                                 </div>
                             );
@@ -625,6 +726,31 @@ export default function CameraList({ search = "", setSearch = () => { }, statusF
                 onAssign={handleAssign}
                 allPermissions={allPermissions}
             />
+
+            {deleteConfirm && (
+                <div className="cl-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+                    <div className="cl-modal-box" onClick={e => e.stopPropagation()}>
+                        <button className="cl-modal-close" onClick={() => setDeleteConfirm(null)} aria-label="ปิด">
+                            <X size={16} />
+                        </button>
+                        <h3 className="cl-modal-title">ลบกล้อง</h3>
+                        <p className="text-sm text-slate-300 mb-4">
+                            ต้องการลบกล้อง <span className="font-semibold text-white">
+                                "{isIncompleteName(deleteConfirm.camera_name) ? "ยังไม่ตั้งชื่อ" : deleteConfirm.camera_name}"
+                            </span> (#{deleteConfirm.camera_id}) ใช่ไหม? การลบไม่สามารถย้อนกลับได้
+                            {getAssignedCount(deleteConfirm.camera_id) > 0 && (
+                                <> ผู้ใช้ที่มีสิทธิ์เข้าถึงกล้องนี้ {getAssignedCount(deleteConfirm.camera_id)} คนจะถูกตัดสิทธิ์ไปด้วย</>
+                            )}
+                        </p>
+                        <div className="cl-modal-actions">
+                            <button className="cl-btn-cancel" onClick={() => setDeleteConfirm(null)}>ยกเลิก</button>
+                            <button className="cl-btn-save" style={{ background: "#dc2626" }} onClick={() => handleDeleteCamera(deleteConfirm)}>
+                                ลบถาวร
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {toastMsg && (
                 <div className={`cl-toast ${toastMsg.type === "error" ? "toast-error" : ""}`}>

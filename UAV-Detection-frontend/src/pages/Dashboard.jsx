@@ -431,8 +431,8 @@ export default function Dashboard() {
 
             <div className="w-full h-[calc(100%-48px)]">
               <div className="w-full h-[55%] overflow-y-hidden border-b border-slate-700">
-                {sideTab === 'situation' && <Situation detectingCameras={detectingCameras} cameras={cameraList} permissionMap={permissionMap} handleCameraSelect={handleCameraClick} />}
-                {sideTab === 'history' && <History events={events} setEvents={setEvents} unReadEvents={unReadEvents} readEvents={readEvents} isFetching={isEventFetching} setIsFetching={setIsEventFetching} />}
+                {sideTab === 'situation' && <Situation detectingCameras={detectingCameras} cameras={cameraList.filter(cam => (cam.deleted !== 1))} permissionMap={permissionMap} handleCameraSelect={handleCameraClick} />}
+                {sideTab === 'history' && <History events={events} setEvents={setEvents} unReadEvents={unReadEvents} readEvents={readEvents} isFetching={isEventFetching} setIsFetching={setIsEventFetching} cameras={cameraList} />}
               </div>
 
               <div className="w-full h-[45%] overflow-hidden">

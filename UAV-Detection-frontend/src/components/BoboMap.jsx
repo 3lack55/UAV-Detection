@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { Map, Satellite } from 'lucide-react';
 import { useWebSocket } from "../context/WebsocketContext.jsx";
 
-const useLeafletLoader = () => {
+export const useLeafletLoader = () => {
     const [isLoaded, setIsLoaded] = useState(false);
 
     useEffect(() => {
@@ -23,8 +23,7 @@ const useLeafletLoader = () => {
         document.head.appendChild(script);
 
         return () => {
-            // ใน Production จริง อาจจะไม่ remove script ออก เพราะอาจใช้ซ้ำ
-            // แต่ remove link css ได้ถ้าต้องการ cleanup
+            
         };
     }, []);
 
@@ -175,7 +174,6 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
     const markersRef = useRef({});
     const tileLayerRef = useRef(null);
 
-    // ใช้ Hook ที่เตรียมไว้
     const mapReady = useLeafletLoader();
     const [mapType, setMapType] = useState(() => {
         if (typeof window === 'undefined') return 'street';
@@ -343,7 +341,7 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
             }).addTo(map);
 
             const marker = window.L.marker([b.lat, b.lng], {
-                icon: createBaseIcon(b.name.split(' ')[0], status)
+                icon: createBaseIcon((b.name || "ไม่ทราบชื่อ").split(' ')[0], status)
             }).addTo(map).bindPopup(createBasePopupContent(b, b.live));
 
             baseLayersRef.current.push(fovPolygon, directionLineCasing, directionLine, directionArrowHead, marker);

@@ -7,7 +7,7 @@ const systemControlRouter = express.Router();
 
 systemControlRouter.get("/allUsers", protect, async (req, res) => {
     try {
-        const users = await doQuery("SELECT user_id, username, role, profile_image, created_at, deleted FROM users");
+        const users = await doQuery("SELECT user_id, username, role, profile_image, created_at, deleted FROM users WHERE deleted != 1");
         res.status(200).json({ success: true, data: users });
 
     } catch (error) {

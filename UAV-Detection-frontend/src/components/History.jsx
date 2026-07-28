@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Camera, Clock, AlertTriangle, CheckCircle2, Target, ChevronDown } from 'lucide-react';
 import { EventDetailModal } from './EventDetailModal';
 
@@ -8,7 +8,7 @@ const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
 
 const PAGE_SIZE = 5;
 
-export function History({ events, setEvents, unReadEvents, readEvents, isFetching, setIsFetching }) {
+export function History({ events, setEvents, unReadEvents, readEvents, isFetching, setIsFetching, cameras= [] }) {
     const [focusedId, setFocusedId] = useState(null);
     const [eventDetails, setEventDetails] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,6 +77,19 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
         });
     };
 
+    const cameraMap = useMemo(() => {
+        return cameras.reduce((map, camera) => {
+            if (camera && camera.camera_id != null) {
+                map[camera.camera_id] = camera.camera_name || `Camera ${camera.camera_id}`;
+            }
+            return map;
+        }, {});
+    }, [cameras]);
+
+    const getCameraName = (cameraId) => {
+        return cameraMap[cameraId] || `Camera ${cameraId}`;
+    };
+
     return (
 
         <div className="w-full h-full flex flex-col text-white bg-slate-800/30">
@@ -113,8 +126,8 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                                             <Camera size={14} />
                                         </div>
                                         <div>
-                                            <h3 className="text-slate-100 font-bold text-xs flex items-center gap-1.5">
-                                                กล้อง {e.camera_id}
+                                            <h3 className="text-slate-100 font-bold text-xs truncate max-w-48 flex items-center gap-1.5">
+                                                {getCameraName(e.camera_id)}
                                                 <span className="flex h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
                                             </h3>
                                             <p className="text-[9px] text-slate-400 font-mono">EVENT: {e.event_id}</p>
@@ -159,7 +172,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                                             <Camera size={14} />
                                         </div>
                                         <div>
-                                            <h3 className="text-slate-300 font-semibold text-xs">กล้อง {e.camera_id}</h3>
+                                            <h3 className="text-slate-300 font-semibold text-xs truncate max-w-48">{getCameraName(e.camera_id)}</h3>
                                             <p className="text-[9px] text-slate-500 font-mono">EVENT: {e.event_id}</p>
                                         </div>
                                     </div>

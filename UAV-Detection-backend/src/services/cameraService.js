@@ -78,7 +78,7 @@ cameraRouter.post("/addCamera", protect, async (req, res) => {
 cameraRouter.delete("/deleteCamera/:cameraId", protect, async (req, res) => {
     try {
         if (!req.params.cameraId) return res.status(400).json({ success: false, message: "Camera ID is required." });
-        const result = await doQuery(`DELETE FROM cameras WHERE camera_id = ${req.params.cameraId}`);
+        const result = await doQuery(`UPDATE cameras SET deleted = 1 WHERE camera_id = ${req.params.cameraId}`);
         if (result.affectedRows === 0) return res.status(400).json({ success: false, message: `Camera ID ${req.params.cameraId} not found.` });
         broadcastSystemUpdate("camera_changed", { action: "deleted", cameraId: req.params.cameraId });
         res.status(200).json({ success: true, message: `Deleted camera with ID ${req.params.cameraId}.` });

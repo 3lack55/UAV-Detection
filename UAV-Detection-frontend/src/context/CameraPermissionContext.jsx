@@ -78,7 +78,7 @@ export function CameraPermissionProvider({ children }) {
                 const data = await response.json();
                 if (data.success) {
                     setCameraList(data.data);
-                    setBasePosition(cameraPositions(data.data));
+                    setBasePosition(cameraPositions(data.data.filter(d => d.deleted !== 1)));
                 }
             } catch (err) {
                 console.error("Error fetching cameras:", err);
