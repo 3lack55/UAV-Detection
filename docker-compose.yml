@@ -1,0 +1,76 @@
+services:
+  mysql:
+    image: mysql:5.7
+    container_name: uav_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-uav_detection}
+      MYSQL_USER: ${MYSQL_USER:-bobo}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-000000000}
+    ports:
+      - "${MYSQL_PORT:-13306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - uav-net
+
+  backend:
+    build:
+      context: ./UAV-Detection-backend
+      dockerfile: Dockerfile
+    container_name: uav_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-uav_detection}
+      MYSQL_USER: ${MYSQL_USER:-bobo}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-000000000}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ./UAV-Detection-backend/uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - uav-net
+
+  frontend:
+    build:
+      context: ./UAV-Detection-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_HOST: ${VITE_API_HOST:-localhost}
+        VITE_API_PORT: ${BACKEND_PORT:-3000}
+        VITE_API_PROTOCOL: ${VITE_API_PROTOCOL:-http}
+        VITE_WS_PROTOCOL: ${VITE_WS_PROTOCOL:-ws}
+    container_name: uav_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - uav-net
+
+volumes:
+  mysql-data:
+
+networks:
+  uav-net:
