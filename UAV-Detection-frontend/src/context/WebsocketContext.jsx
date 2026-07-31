@@ -1,18 +1,15 @@
-import { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { useAuth } from "./AuthContext";
-
-const HOST = import.meta.env.VITE_API_HOST || "localhost";
-const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
-const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "ws";
-
-const WebSocketContext = createContext();
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import { useAuth } from "./useAuth";
+import { WEBSOCKET_BASE_URL } from "../config/api";
+import { WebSocketContext } from "./websocket-context-definition";
 
 export function WebSocketProvider({ children }) {
     const socketRef = useRef(null);
     const reconnectIntervalRef = useRef(null);
+    const connectWebSocketRef = useRef(null);
     const shouldReconnectRef = useRef(true);
     const isInitializedRef = useRef(false);
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const [connected, setConnected] = useState(false);
     const [statusUpdate, setStatusUpdate] = useState(null);
     const [systemEvent, setSystemEvent] = useState(null);
@@ -105,12 +102,12 @@ export function WebSocketProvider({ children }) {
 
     const RECONNECT_INTERVAL = 5000; // 5 seconds
 
-    const connectWebSocket = (token) => {
+    const connectWebSocket = useCallback((token) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
             return;
         }
 
-        const ws = new WebSocket(`${PROTOCOL}://${HOST}:${HOST_PORT}/client`);
+        const ws = new WebSocket(`${WEBSOCKET_BASE_URL}/client`);
         socketRef.current = ws;
 
         ws.onopen = () => {
@@ -199,7 +196,7 @@ export function WebSocketProvider({ children }) {
                 reconnectIntervalRef.current = setInterval(() => {
                     if (shouldReconnectRef.current && socketRef.current?.readyState !== WebSocket.OPEN) {
                         console.log("Attempting to reconnect...");
-                        connectWebSocket(token);
+                        connectWebSocketRef.current?.(token);
                     }
                 }, RECONNECT_INTERVAL);
             }
@@ -209,7 +206,11 @@ export function WebSocketProvider({ children }) {
             console.error("Client WebSocket error:", error);
             setConnected(false);
         };
-    };
+    }, [playDroneAlarm]);
+
+    useEffect(() => {
+        connectWebSocketRef.current = connectWebSocket;
+    }, [connectWebSocket]);
 
     // Initialize connection once when user is authenticated
     useEffect(() => {
@@ -224,9 +225,11 @@ export function WebSocketProvider({ children }) {
                 reconnectIntervalRef.current = null;
             }
             isInitializedRef.current = false;
-            setConnected(false);
-            setReconnecting(false);
-            return;
+            const resetTimeout = setTimeout(() => {
+                setConnected(false);
+                setReconnecting(false);
+            }, 0);
+            return () => clearTimeout(resetTimeout);
         }
 
         // Only initialize connection once
@@ -249,7 +252,7 @@ export function WebSocketProvider({ children }) {
             }
             isInitializedRef.current = false;
         };
-    }, [user?.token]);
+    }, [user, connectWebSocket]);
 
     const sendMessage = useCallback((data) => {
         if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -278,5 +281,3 @@ export function WebSocketProvider({ children }) {
         </WebSocketContext.Provider>
     );
 }
-
-export const useWebSocket = () => useContext(WebSocketContext);

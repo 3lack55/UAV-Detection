@@ -1,12 +1,8 @@
-import { useEffect, useContext, useState, createContext } from "react";
-import { useAuth } from "./AuthContext";
-import { useWebSocket } from "./WebsocketContext";
-
-const CameraPermissionContext = createContext();
-
-const HOST = import.meta.env.VITE_API_HOST || "localhost";
-const HOST_PORT = import.meta.env.VITE_API_PORT || "3000";
-const PROTOCOL = import.meta.env.VITE_API_PROTOCOL || "http";
+import { useEffect, useState } from "react";
+import { useAuth } from "./useAuth";
+import { useWebSocket } from "./useWebSocket";
+import { getAllCameras, getCameraPermissions } from "../services/cameraApi";
+import { CameraPermissionContext } from "./camera-permission-context-definition";
 
 const cameraPositions = (data) => {
     return data.map(cam => ({
@@ -33,12 +29,7 @@ export function CameraPermissionProvider({ children }) {
 
         const fetchPermissions = async () => {
             try {
-                const response = await fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getCameraPermissionsByUser/${user.user_id}`, {
-                    headers: {
-                        Authorization: `Bearer ${user.token}`,
-                    }
-                });
-                const data = await response.json();
+                const data = await getCameraPermissions(user.user_id, user.token);
                 setPermissions(data?.data || []);
             } catch (err) {
                 console.error("Error fetching camera permissions:", err);
@@ -48,7 +39,7 @@ export function CameraPermissionProvider({ children }) {
         };
 
         fetchPermissions();
-    }, [user?.user_id, user?.token]);
+    }, [user]);
 
     useEffect(() => {
         if (!user || !systemEvent) return;
@@ -57,16 +48,13 @@ export function CameraPermissionProvider({ children }) {
             const targetUser = systemEvent.data?.userId;
             if (!targetUser || String(targetUser) === String(user.user_id)) {
                 setLoading(true);
-                fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getCameraPermissionsByUser/${user.user_id}`, {
-                    headers: { Authorization: `Bearer ${user.token}` }
-                })
-                    .then(res => res.json())
+                getCameraPermissions(user.user_id, user.token)
                     .then(data => setPermissions(data?.data || []))
                     .catch(err => console.error("Error refreshing camera permissions:", err))
                     .finally(() => setLoading(false));
             }
         }
-    }, [systemEvent, user?.user_id, user?.token]);
+    }, [systemEvent, user]);
 
     useEffect(() => {
         if (!connected) return;
@@ -74,8 +62,7 @@ export function CameraPermissionProvider({ children }) {
 
         const fetchCameras = async () => {
             try {
-                const response = await fetch(`${PROTOCOL}://${HOST}:${HOST_PORT}/api/camera/getAllCameras`);
-                const data = await response.json();
+                const data = await getAllCameras();
                 if (data.success) {
                     setCameraList(data.data);
                     setBasePosition(cameraPositions(data.data.filter(d => d.deleted !== 1)));
@@ -85,7 +72,7 @@ export function CameraPermissionProvider({ children }) {
             }
         };
         fetchCameras();
-    }, [connected, systemEvent?.event, systemEvent?.data?.timestamp]);
+    }, [connected, systemEvent]);
 
     return (
         <CameraPermissionContext.Provider value={{ permissions, loading, basePosition, cameraList }}>
@@ -93,5 +80,3 @@ export function CameraPermissionProvider({ children }) {
         </CameraPermissionContext.Provider>
     );
 }
-
-export const useCameraPermissions = () => useContext(CameraPermissionContext);

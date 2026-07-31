@@ -27,7 +27,7 @@ export function handleCameraConnection(ws, wss) {
                         return;
                     }
 
-                    const cameraExists = await doQuery("SELECT camera_id FROM cameras WHERE camera_id = ?", [cameraId]);
+                    const cameraExists = await doQuery("SELECT camera_id FROM cameras WHERE camera_id = ? AND deleted != 1", [cameraId]);
                     if (cameraExists.length === 0) {
                         console.warn(`Camera connection rejected: Camera ${cameraId} not found in database.`);
                         if (authTimeout) clearTimeout(authTimeout);

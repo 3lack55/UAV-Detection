@@ -1,23 +1,23 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { useState } from "react";
+import { AuthContext } from "./auth-context-definition";
 
-const AuthContext = createContext();
+function getStoredUser() {
+    const token = sessionStorage.getItem("token");
+    if (!token) return null;
+
+    return {
+        token,
+        user_id: sessionStorage.getItem("user_id"),
+        username: sessionStorage.getItem("username"),
+        role: sessionStorage.getItem("role"),
+        profile_image: sessionStorage.getItem("profile_image"),
+    };
+}
 
 export function AuthProvider({ children }) {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(getStoredUser);
+    const [loading] = useState(false);
     const [redirectUrl, setRedirectUrl] = useState(null);
-
-    useEffect(() => {
-        const token = sessionStorage.getItem("token");
-        const user_id = sessionStorage.getItem("user_id");
-        const username = sessionStorage.getItem("username");
-        const role = sessionStorage.getItem("role");
-        const profile_image = sessionStorage.getItem("profile_image");
-        if (token) {
-            setUser({ token, username, user_id, role, profile_image });
-        }
-        setLoading(false);
-    }, []);
 
     const login = (token, username, user_id, role, profile_image) => {
         sessionStorage.setItem("token", token);
@@ -58,5 +58,3 @@ export function AuthProvider({ children }) {
         </AuthContext.Provider>
     );
 }
-
-export const useAuth = () => useContext(AuthContext);
