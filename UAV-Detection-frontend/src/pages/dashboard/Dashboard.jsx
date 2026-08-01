@@ -131,7 +131,7 @@ export default function Dashboard() {
           <div className={`absolute top-1/2 -translate-y-1/2 -left-[416px] z-[1001] w-[432px] h-full p-4 ${leftTabOn ? 'translate-x-[416px]' : 'translate-x-0'} transition-transform duration-300`}>
             <div className="w-full h-full bg-slate-800/80 backdrop-blur-[2px] relative rounded-lg border border-slate-700 overflow-y-auto overflow-x-hidden custom-scrollbar px-4">
               <DashboardCameraList
-                cameras={cameraList}
+                cameras={cameraList.filter(cam => (!cam.deleted))}
                 permissionMap={permissionMap}
                 onCameraClick={handleCameraClick}
               />

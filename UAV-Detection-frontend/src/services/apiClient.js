@@ -12,7 +12,7 @@ export async function requestJson(path, options = {}) {
     ? await response.json()
     : null;
 
-  if (!response.ok) {
+  if (!response.ok && data?.success !== false) {
     throw new Error(data?.message || `Request failed with status ${response.status}`);
   }
 

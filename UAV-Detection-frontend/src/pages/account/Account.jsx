@@ -374,7 +374,7 @@ export default function Account() {
                         {/* Sidebar Tabs */}
                         <div className="w-full border-b pb-2 border-slate-700 lg:border-b-0 lg:pb-0  lg:h-full">
                             <div className="lg:flex lg:flex-col lg:justify-between lg:h-full">
-                                <div className="flex items-center flex-1 lg:flex-col gap-3 lg:gap-0">
+                                <div className="flex items-center flex-1 lg:flex-col lg:gap-0">
                                     {[
                                         { id: "profile", label: "ข้อมูลโปรไฟล์", icon: User },
                                         { id: "password", label: "เปลี่ยนรหัสผ่าน", icon: Lock },

@@ -1,0 +1,125 @@
+.leaflet-popup-content-wrapper {
+    background: rgba(15, 23, 42, 0.9) !important;
+    color: #f8fafc !important;
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    backdrop-filter: blur(8px);
+    border-radius: 8px !important;
+    padding: 0;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-tip {
+    background: rgba(15, 23, 42, 0.9) !important;
+}
+
+.leaflet-popup-content {
+    margin: 0 !important;
+    width: auto !important;
+}
+
+.leaflet-control-zoom {
+    background-color: rgb(15 23 42 / 0.9);
+    border: 1px solid #334155;
+    border-radius: 8px !important;
+}
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+    background: rgba(15, 23, 42, 0.5) !important;
+    color: #f8fafc !important;
+    border: 1px solid #334155;
+    cursor: pointer;
+}
+
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+    background: rgba(61, 68, 83, 0.7) !important;
+}
+
+.tactical-popup {
+    padding: 18px 12px 6px 12px;
+    min-width: 250px;
+    font-family: 'Kanit';
+}
+
+.popup-header {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 8px;
+    padding-left: 10px;
+}
+
+.status-row {
+    font-size: 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 4px;
+}
+
+.coord-row {
+    display: flex;
+    gap: 8px;
+}
+
+.coord {
+    font-size: 10px;
+    color: #cbd5e1;
+}
+
+.coord span {
+    color: #64748b;
+    margin-right: 4px;
+}
+
+.base-marker-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.base-tactical-box {
+    width: 30px;
+    height: 30px;
+    border: 2px solid white;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    transform: rotate(-45deg);
+    transition: all 0.3s ease;
+}
+
+.base-tactical-box svg {
+    transform: rotate(45deg);
+    filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
+}
+
+.base-label-tag {
+    margin-top: 4px;
+    font-size: 9px;
+    font-weight: 900;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid white;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.base-signal-ring {
+    position: absolute;
+    top: 15px;
+    left: 20px;
+    width: 30px;
+    height: 30px;
+    margin-top: -15px;
+    margin-left: -15px;
+    border: 2px solid #22DD5D;
+    border-radius: 50%;
+    animation: base-signal-expand 3s infinite;
+    opacity: 0;
+    pointer-events: none;
+}

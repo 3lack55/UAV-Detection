@@ -7,10 +7,18 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import crypto from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const authRouter = express.Router();
+
+function generateTempPassword(length = 10) {
+    return crypto.randomBytes(length * 2)
+        .toString('base64')
+        .replace(/[^a-zA-Z0-9]/g, '')
+        .slice(0, length);
+}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -66,6 +74,48 @@ authRouter.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
         await doQuery('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]);
         res.status(201).json({ success: true, message: 'สมัครสมาชิกสำเร็จ' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Server error', error: error.message });
+    }
+});
+
+authRouter.post('/admin/create-user', protect, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, message: 'เฉพาะ Admin เท่านั้นที่สร้างผู้ใช้ได้' });
+        }
+
+        const { username, role } = req.body;
+        if (!username || !username.trim()) {
+            return res.status(400).json({ success: false, message: 'กรุณาระบุชื่อผู้ใช้' });
+        }
+
+        const existingUser = await doQuery('SELECT user_id FROM users WHERE username = ?', [username]);
+        if (existingUser.length > 0) {
+            return res.status(400).json({ success: false, message: 'ชื่อผู้ใช้งานนี้ถูกใช้แล้ว' });
+        }
+
+        const allowedRoles = ['admin', 'user'];
+        const finalRole = allowedRoles.includes(role) ? role : 'user';
+
+        const tempPassword = generateTempPassword();
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+        const result = await doQuery(
+            'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+            [username.trim(), hashedPassword, finalRole]
+        );
+
+        res.status(201).json({
+            success: true,
+            message: 'สร้างผู้ใช้งานสำเร็จ',
+            data: {
+                user_id: result.insertId,
+                username: username.trim(),
+                role: finalRole,
+                tempPassword,
+            },
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error', error: error.message });
     }

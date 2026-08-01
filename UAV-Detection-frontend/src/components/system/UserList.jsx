@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react"
-import { Loader2, ChevronDown, UserPlus } from "lucide-react";
+import { Loader2, ChevronDown, UserPlus, Copy, CopyCheck } from "lucide-react";
 import { useAuth } from "../../context/useAuth";
 import { useWebSocket } from "../../context/useWebSocket";
 import { API_BASE_URL } from "../../config/api";
@@ -117,8 +117,8 @@ function AddUserModal({ open, onClose, onCreated, token }) {
             } else {
                 setFormError(result.message || "สร้างผู้ใช้ไม่สำเร็จ");
             }
-        } catch {
-            setFormError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+        } catch (error) {
+            setFormError("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + (error.message || ""));
         } finally {
             setSubmitting(false);
         }
@@ -126,7 +126,7 @@ function AddUserModal({ open, onClose, onCreated, token }) {
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className={`modal-box add-user-modal ${formError ? "add-user-modal-error" : ""}`} onClick={e => e.stopPropagation()}>
                 <button className="modal-close-btn" onClick={onClose} aria-label="ปิด">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M2 2L14 14M14 2L2 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -136,13 +136,18 @@ function AddUserModal({ open, onClose, onCreated, token }) {
 
                 <div className="mt-4 space-y-4 text-left">
                     <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1.5">ชื่อผู้ใช้</label>
+                        <label className="block text-xs font-medium text-slate-400 mb-1.5">ชื่อผู้ใช้ <span className="add-user-required">*</span></label>
                         <input
                             type="text"
                             value={username}
-                            onChange={e => setUsername(e.target.value)}
+                            onChange={e => {
+                                setUsername(e.target.value);
+                                if (formError) setFormError("");
+                            }}
                             placeholder="เช่น operator1"
-                            className="w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+                            className={`w-full px-3 py-2 rounded-lg bg-slate-800 border text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 ${formError && !username.trim() ? "add-user-input-invalid border-rose-400" : "border-slate-700"}`}
+                            aria-invalid={Boolean(formError && !username.trim())}
+                            required
                             autoFocus
                         />
                     </div>
@@ -161,13 +166,15 @@ function AddUserModal({ open, onClose, onCreated, token }) {
                         ระบบจะสุ่มรหัสผ่านชั่วคราวให้อัตโนมัติ และแสดงให้คัดลอกเพียงครั้งเดียวหลังสร้างเสร็จ
                     </p>
                     {formError && (
-                        <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-md px-3 py-2">{formError}</p>
+                        <div className="mb-4">
+                            <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-md px-3 py-2 mb-4">{formError}</p>
+                        </div>
                     )}
                 </div>
 
                 <div className="modal-actions">
                     <button className="btn-cancel" onClick={onClose} disabled={submitting}>ยกเลิก</button>
-                    <button className="btn-confirm" onClick={handleSubmit} disabled={submitting}>
+                    <button className="btn-confirm confirm" onClick={handleSubmit} disabled={submitting}>
                         {submitting ? "กำลังสร้าง..." : "สร้างผู้ใช้"}
                     </button>
                 </div>
@@ -185,9 +192,7 @@ function TempPasswordModal({ result, onClose }) {
             await navigator.clipboard.writeText(result.tempPassword);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-        } catch {
-            // clipboard API อาจใช้ไม่ได้ในบาง context (เช่นหน้าที่ไม่ใช่ https) - ผู้ใช้ก็ยัง select-all คัดลอกเองได้
-        }
+        } catch {}
     };
 
     return (
@@ -197,19 +202,20 @@ function TempPasswordModal({ result, onClose }) {
                 <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2 mt-3">
                     รหัสผ่านนี้จะแสดง "ครั้งเดียว" เท่านั้น กรุณาคัดลอกและส่งให้ผู้ใช้ทันที ระบบจะไม่สามารถเรียกดูรหัสผ่านนี้ได้อีกในภายหลัง
                 </p>
-                <div className="mt-4 flex items-center gap-2">
+                <div className="my-4 flex items-center gap-2">
                     <code className="flex-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-emerald-400 font-mono tracking-wide select-all">
                         {result.tempPassword}
                     </code>
                     <button
                         onClick={handleCopy}
-                        className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors whitespace-nowrap"
+                        className="px-3 py-2 rounded-lg bg-slate-400/10 hover:bg-slate-400/20 text-white text-xs font-semibold transition-colors whitespace-nowrap"
+                        title={copied ? "คัดลอกแล้ว" : "คัดลอกไปยังคลิปบอร์ด"}
                     >
-                        {copied ? "คัดลอกแล้ว" : "คัดลอก"}
+                        {copied ? <CopyCheck className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </button>
                 </div>
                 <div className="modal-actions">
-                    <button className="btn-confirm" onClick={onClose}>เสร็จสิ้น</button>
+                    <button className="btn-confirm confirm" onClick={onClose}>เสร็จสิ้น</button>
                 </div>
             </div>
         </div>
@@ -227,6 +233,8 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
     const [confirmModal, setConfirmModal] = useState(null);
     const [toastMsg, setToastMsg] = useState(null);
     const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+    const [addUserModal, setAddUserModal] = useState(false);
+    const [newUserResult, setNewUserResult] = useState(null);
 
     const apiBase = API_BASE_URL;
 
@@ -367,6 +375,19 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
         });
     };
 
+    const handleUserCreated = (data) => {
+        setUsers(prev => [...prev, {
+            user_id: data.user_id,
+            username: data.username,
+            role: data.role,
+            profile_image: null,
+            deleted: 0,
+            created_at: new Date().toISOString(),
+        }]);
+        setAddUserModal(false);
+        setNewUserResult(data);
+    };
+
     if (loading) {
         return (
             <div className="ul-loading flex items-center justify-center gap-2">
@@ -429,6 +450,22 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                             <option value="banned">Banned</option>
                         </select>
                     </div>
+                </div>
+
+                <div>
+                    {user?.role === "admin" && (
+                        <div className="flex items-center justify-between mb-5">
+                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                                ผู้ใช้งานทั้งหมด ({stats.total})
+                            </span>
+                            <button
+                                onClick={() => setAddUserModal(true)}
+                                className="add-btn"
+                            >
+                                <UserPlus size={14} /> เพิ่มผู้ใช้
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* User list */}
@@ -584,6 +621,19 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                     onCancel={() => setConfirmModal(null)}
                 />
             )}
+
+            {/* Add User Modal */}
+            <AddUserModal
+                open={addUserModal}
+                onClose={() => setAddUserModal(false)}
+                onCreated={handleUserCreated}
+                token={user.token}
+            />
+
+            <TempPasswordModal
+                result={newUserResult}
+                onClose={() => setNewUserResult(null)}
+            />
 
             {/* Toast */}
             {toastMsg && (

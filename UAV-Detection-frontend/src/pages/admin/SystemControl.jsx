@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { MoveLeft, Settings, Users, Camera, Info } from "lucide-react";
+import { MoveLeft, Settings, Users, Camera, Gauge } from "lucide-react";
 import UserList from "../../components/system/UserList";
 import CameraList from "../../components/system/CameraList";
+import SystemStatus from "../../components/system/Systemstatus";
 import { Link } from "react-router-dom";
 import { useWebSocket } from "../../context/useWebSocket";
 import { useCameraPermissions } from "../../context/useCameraPermissions";
@@ -88,7 +89,7 @@ export default function SystemControl() {
                         </div>
 
                         {activeTab === "users" && (
-                            <div className="hidden lg:block lg:flex-grow">
+                            <div className="hidden h-40 lg:block lg:flex-grow">
                                 {/* Stats */}
                                 <div className="ul-stats">
                                     <div className="ul-stat">
@@ -134,7 +135,7 @@ export default function SystemControl() {
                         )}
 
                         {activeTab === "camera" && (
-                            <div className="hidden lg:block lg:flex-grow">
+                            <div className="hidden h-40 lg:block lg:flex-grow">
                                 {/* Stats */}
                                 <div className="ul-stats">
                                     <div className="ul-stat">
@@ -178,17 +179,23 @@ export default function SystemControl() {
                                 </div>
                             </div>
                         )}
+
+                        {activeTab === "systemStatus" && (
+                            <div className="hidden h-40 lg:block lg:flex-grow">
+                                {/* Stats */}
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex flex-col w-full lg:flex-row flex-grow lg:gap-4 lg:flex-grow lg:min-h-0 relative pb-6 ">
                     <div className="lg:w-[320px] w-full lg:flex lg:flex-col justify-between lg:px-4 lg:m-0 lg:pb-0 lg:border-r lg:border-b-0 lg:border-slate-700 sticky top-0 bg-slate-900 lg:bg-transparent" >
-                        <div className="flex gap-4 lg:flex-col lg:gab">
+                        <div className="flex lg:flex-col">
                             {[
                                 // { id: "general", label: "ทั่วไป", icon: Settings },
                                 { id: "users", label: "ผู้ใช้งาน", icon: Users },
                                 { id: "camera", label: "กล้อง", icon: Camera },
-                                // { id: "about", label: "เกี่ยวกับ", icon: Info },
+                                { id: "systemStatus", label: "สถานะระบบ", icon: Gauge },
                             ].map((tab) => {
                                 const IconComponent = tab.icon;
                                 return (
@@ -217,12 +224,6 @@ export default function SystemControl() {
                     </div>
 
                     <div className="flex-grow p-4 lg:p-[0px_16px_0px_0px]  justify-center lg:overflow-y-auto lg:min-h-0 right-content-scroll">
-                        {activeTab == "general" && (
-                            <div>
-                                <p>General</p>
-                            </div>
-                        )}
-
                         {activeTab === "users" && (
                             <UserList search={search} setSearch={setSearch} roleFilter={roleFilter} setRoleFilter={setRoleFilter} onStatsUpdate={setStats} />
                         )}
@@ -235,6 +236,10 @@ export default function SystemControl() {
                                 setStatusFilter={setCameraStatusFilter}
                                 onStatsUpdate={setCameraStats}
                             />
+                        )}
+
+                        {activeTab === "systemStatus" && (
+                            <SystemStatus />
                         )}
                     </div>
 

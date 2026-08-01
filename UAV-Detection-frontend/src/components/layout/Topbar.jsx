@@ -72,7 +72,7 @@ function Topbar() {
             return (
                 <div className="relative" ref={dropdownRef}>
                     <div
-                        className={`flex items-center gap-2 p-1 pr-1.5 max-md:p-0 rounded-full bg-slate-700/30 border border-blue-500/50 ${hasUsers ? "cursor-pointer hover:bg-slate-700/50" : ""} transition-colors`}
+                        className={`flex items-center gap-2 p-1 pr-1.5 max-md:p-0 max-md:border-0 rounded-full bg-slate-700/30 border border-blue-500/50 ${hasUsers ? "cursor-pointer hover:bg-slate-700/50" : ""} transition-colors`}
                         onClick={() => hasUsers && setShowAllUsers((prev) => !prev)}
                     >
                         {hasUsers ? (

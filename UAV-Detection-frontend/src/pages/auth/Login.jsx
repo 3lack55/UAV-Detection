@@ -199,6 +199,10 @@ export default function Login() {
         try {
             const data = await loginUser(form);
 
+            if (!data.success) {
+                return setServerError(data.message || "เข้าสู่ระบบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+            }
+
             const banned = data.user.role === "banned" ? true : false;
             const deleted = data.user.deleted;
 

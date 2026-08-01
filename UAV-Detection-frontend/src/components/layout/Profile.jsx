@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../../context/useAuth";
 import { useNavigate, Link } from "react-router-dom";
 import { API_BASE_URL } from "../../config/api";
+import { Settings, UserRoundCog, LogOut } from "lucide-react";
 
 export default function Profile() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -69,6 +70,7 @@ export default function Profile() {
                                 
                                 <Link to="/system-control">
                                     <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400 rounded-lg transition-colors">
+                                        <Settings className="w-5 h-5" />
                                         <span>จัดการระบบ</span>
                                     </button>
                                 </Link>
@@ -77,6 +79,7 @@ export default function Profile() {
                         <div className="p-1">
                             <Link to="/account">
                                 <button className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400 rounded-lg transition-colors">
+                                    <UserRoundCog className="w-5 h-5" />
                                     <span>จัดการบัญชี</span>
                                 </button>
                             </Link>
@@ -88,6 +91,7 @@ export default function Profile() {
                                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
                                 onClick={handleLogout}
                             >
+                                <LogOut className="w-5 h-5" />
                                 <span>ออกจากระบบ</span>
                             </button>
                         </div>
