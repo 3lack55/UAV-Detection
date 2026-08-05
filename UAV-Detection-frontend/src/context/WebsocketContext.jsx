@@ -13,6 +13,7 @@ export function WebSocketProvider({ children }) {
     const [connected, setConnected] = useState(false);
     const [statusUpdate, setStatusUpdate] = useState(null);
     const [systemEvent, setSystemEvent] = useState(null);
+    const [eventHistory, setEventHistory] = useState(null);
     const holderImageRef = useRef(null);
     const allMetaDataRef = useRef(null);
     const [reconnecting, setReconnecting] = useState(false);
@@ -178,6 +179,11 @@ export function WebSocketProvider({ children }) {
                     allMetaDataRef.current = parsedData.data.metaData || {};
                     return;
                 }
+
+                if (parsedData.type === 'event_history_update') {
+                    setEventHistory(parsedData.data || []);
+                    return;
+                }
             } catch (error) {
                 console.error("Error parsing WebSocket message:", error);
             }
@@ -267,13 +273,14 @@ export function WebSocketProvider({ children }) {
         connected,
         statusUpdate,
         systemEvent,
+        eventHistory,
         holderImageRef,
         allMetaDataRef,
         sendMessage,
         reconnecting,
         authRequired,
         clearAuthRequired: () => setAuthRequired(false),
-    }), [connected, statusUpdate, systemEvent, holderImageRef, allMetaDataRef, sendMessage, reconnecting, authRequired]);
+    }), [connected, statusUpdate, systemEvent, eventHistory, holderImageRef, allMetaDataRef, sendMessage, reconnecting, authRequired]);
 
     return (
         <WebSocketContext.Provider value={contextValue}>

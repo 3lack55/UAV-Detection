@@ -211,13 +211,18 @@ export default function SystemStatus() {
                             <div className="mt-4 pt-3 border-t border-slate-700/50">
                                 <div className="text-xs text-slate-400 mb-2">กล้องที่พบการเคลื่อนไหวขณะนี้:</div>
                                 <div className="flex flex-wrap gap-2">
-                                    {detectingCameras.map((camera) => (
-                                        <span key={camera.cameraId} className="inline-flex items-center gap-1.5 rounded-md bg-rose-500/10 border border-rose-500/30 px-2 py-1 text-xs font-medium text-rose-300 shadow-sm shadow-rose-500/10">
-                                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute opacity-75"></span>
-                                            <span className="w-2 h-2 rounded-full bg-rose-500 relative"></span>
-                                            Cam {camera.cameraId}
-                                        </span>
-                                    ))}
+                                    {detectingCameras.map((camera) => {
+                                        const cameraInfo = cameraList.find((item) => String(item.camera_id) === String(camera.cameraId));
+                                        const cameraName = cameraInfo?.camera_name || cameraInfo?.name || (camera.cameraId ? `Camera ${camera.cameraId}` : "Unknown Camera");
+                                        return (
+                                            <span key={camera.cameraId} className="inline-flex items-center gap-1.5 rounded-md bg-rose-500/10 border border-rose-500/30 px-2 py-1 text-xs font-medium text-rose-300 shadow-sm shadow-rose-500/10">
+                                                <span className="w-2 h-2 rounded-full bg-rose-500 relative">
+                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute opacity-75"></span>
+                                                </span>
+                                                {cameraName}
+                                            </span>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}

@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
 import { getEvents } from "../services/eventApi";
+import { useWebSocket } from "../context/useWebSocket";
 
 export function useDashboardEvents(connected) {
   const [events, setEvents] = useState([]);
   const [isEventFetching, setIsEventFetching] = useState(true);
+  const { eventHistory } = useWebSocket();
 
   useEffect(() => {
-    if (!connected) return undefined;
+    if (!connected) {
+      return undefined;
+    }
 
     let cancelled = false;
 
@@ -29,13 +33,17 @@ export function useDashboardEvents(connected) {
     };
 
     fetchHistory();
-    const intervalId = setInterval(fetchHistory, 30000);
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
     };
   }, [connected]);
+
+  useEffect(() => {
+    if (connected && eventHistory !== null) {
+      setEvents(eventHistory);
+    }
+  }, [connected, eventHistory]);
 
   const unReadEvents = events.filter((event) => event.seen === 0);
   const readEvents = events.filter((event) => event.seen === 1);

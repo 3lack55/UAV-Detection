@@ -1,4 +1,5 @@
 import { cameraSessions, clientSessions, events } from './state.js';
+import { doQuery } from '../database/mysqlConnection.js';
 
 export function broadcastToViewers(cameraId, data, isBinary) {
     const session = cameraSessions.get(cameraId);
@@ -16,6 +17,28 @@ export function broadcastToViewers(cameraId, data, isBinary) {
                 console.error(`Broadcast error: ${e.message}`);
             }
         }
+    }
+}
+
+export async function broadcastEventHistoryUpdate() {
+    try {
+        const eventsList = await doQuery('SELECT * FROM events ORDER BY start_time DESC');
+        const payload = {
+            type: 'event_history_update',
+            data: eventsList
+        };
+
+        for (const [ws] of clientSessions.entries()) {
+            if (ws.readyState === 1) {
+                try {
+                    ws.send(JSON.stringify(payload));
+                } catch (e) {
+                    console.error(`Broadcast event history error: ${e.message}`);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to broadcast event history update:', error);
     }
 }
 

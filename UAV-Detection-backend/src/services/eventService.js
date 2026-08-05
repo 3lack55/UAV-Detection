@@ -1,6 +1,7 @@
 import express from "express";
 import fs from "fs";
 import { doQuery } from "../database/mysqlConnection.js";
+import { broadcastEventHistoryUpdate } from "../websocket/broadcast.js";
 
 const eventRouter = express.Router();
 
@@ -17,7 +18,9 @@ eventRouter.post("/createEvent", async (req, res) => {
             success: true,
             message: "Event created successfully.",
             eventId: result.insertId
-        })
+        });
+
+        broadcastEventHistoryUpdate().catch(() => {});
     } catch (error) {
         console.error("Database error:", error);
         return res.status(500).json({ success: false, message: "Internal server error." });
@@ -39,8 +42,9 @@ eventRouter.patch("/endEvent", async (req, res) => {
         res.status(200).json({
             success: true,
             message: "Event ended successfully."
-        })
+        });
 
+        broadcastEventHistoryUpdate().catch(() => {});
     } catch (error) {
         console.error("Database error:", error);
         return res.status(500).json({ success: false, message: "Internal server error." });
@@ -79,6 +83,8 @@ eventRouter.patch("/markEventRead", async (req, res) => {
             success: true,
             message: "Event marked as read successfully."
         });
+
+        broadcastEventHistoryUpdate().catch(() => {});
     } catch (error) {
         console.error("Database error:", error);
         return res.status(500).json({ success: false, message: "Internal server error." });
