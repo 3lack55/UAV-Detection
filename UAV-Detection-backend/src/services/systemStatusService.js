@@ -223,10 +223,10 @@ async function getOperationalInfo() {
             SELECT
                 COUNT(*) AS total_events,
                 SUM(CASE WHEN end_time IS NULL THEN 1 ELSE 0 END) AS active_events,
-                SUM(CASE WHEN start_time >= NOW() - INTERVAL 24 HOUR THEN 1 ELSE 0 END) AS events_last_24h,
+                SUM(CASE WHEN start_time >= ? THEN 1 ELSE 0 END) AS events_last_24h,
                 MAX(start_time) AS last_event_at
             FROM events
-        `),
+        `, [new Date(Date.now() - 24 * 60 * 60 * 1000)]),
     ]);
 
     const connectedCameraIds = new Set(

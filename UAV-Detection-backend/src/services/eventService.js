@@ -33,9 +33,9 @@ eventRouter.patch("/endEvent", async (req, res) => {
         return res.status(400).json({ success: false, message: "Event ID is required." });
     }
 
-    const query = "UPDATE events SET end_time = NOW() WHERE event_id = ?";
+    const query = "UPDATE events SET end_time = ? WHERE event_id = ?";
     try {
-        const result = await doQuery(query, [eventId]);
+        const result = await doQuery(query, [new Date(), eventId]);
         if (result.affectedRows === 0) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
