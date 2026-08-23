@@ -69,6 +69,19 @@ services:
     networks:
       - uav-net
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: uav_cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_healthy
+    networks:
+      - uav-net
+
 volumes:
   mysql-data:
 

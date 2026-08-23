@@ -3,7 +3,7 @@ import { cameraSessions, JWT_SECRET } from '../state.js';
 import { getOrCreateSession, unpackage } from '../utils.js';
 import { broadcastToViewers, broadcastHolderImage, broadcastMetaData, broadcastToClients } from '../broadcast.js';
 import { updateCameraStatus } from '../cameraStatus.js';
-import { uavEventHandler } from '../eventManager.js';
+import { uavEventHandler } from '../eventmanager.js';
 import { doQuery } from '../../database/mysqlConnection.js';
 
 // --- กรณีเป็น Sender (Camera/Python) ---
