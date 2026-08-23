@@ -61,8 +61,7 @@ export function WebSocketProvider({ children }) {
             ? audioCtx.resume()
             : Promise.resolve();
 
-        ensureAudio.then(() => {
-            const now = audioCtx.currentTime;
+        const scheduleBlast = (startAt) => {
             const duration = 0.8;
 
             const mainOsc = audioCtx.createOscillator();
@@ -72,32 +71,42 @@ export function WebSocketProvider({ children }) {
             mainOsc.type = 'sawtooth';
             subOsc.type = 'sawtooth';
 
-            mainOsc.frequency.setValueAtTime(600, now);
-            subOsc.frequency.setValueAtTime(610, now);
+            mainOsc.frequency.setValueAtTime(600, startAt);
+            subOsc.frequency.setValueAtTime(610, startAt);
 
-            gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(0.3, now + 0.05);
-            gainNode.gain.setValueAtTime(0.3, now + duration - 0.1);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            gainNode.gain.setValueAtTime(0, startAt);
+            gainNode.gain.linearRampToValueAtTime(0.3, startAt + 0.05);
+            gainNode.gain.setValueAtTime(0.3, startAt + duration - 0.1);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, startAt + duration);
 
-            mainOsc.frequency.linearRampToValueAtTime(1000, now + 0.2);
-            subOsc.frequency.linearRampToValueAtTime(1010, now + 0.2);
-            mainOsc.frequency.linearRampToValueAtTime(500, now + 0.4);
-            subOsc.frequency.linearRampToValueAtTime(510, now + 0.4);
+            mainOsc.frequency.linearRampToValueAtTime(1000, startAt + 0.2);
+            subOsc.frequency.linearRampToValueAtTime(1010, startAt + 0.2);
+            mainOsc.frequency.linearRampToValueAtTime(500, startAt + 0.4);
+            subOsc.frequency.linearRampToValueAtTime(510, startAt + 0.4);
 
-            mainOsc.frequency.linearRampToValueAtTime(1200, now + 0.6);
-            subOsc.frequency.linearRampToValueAtTime(1210, now + 0.6);
-            mainOsc.frequency.linearRampToValueAtTime(400, now + duration);
-            subOsc.frequency.linearRampToValueAtTime(410, now + duration);
+            mainOsc.frequency.linearRampToValueAtTime(1200, startAt + 0.6);
+            subOsc.frequency.linearRampToValueAtTime(1210, startAt + 0.6);
+            mainOsc.frequency.linearRampToValueAtTime(400, startAt + duration);
+            subOsc.frequency.linearRampToValueAtTime(410, startAt + duration);
 
             mainOsc.connect(gainNode);
             subOsc.connect(gainNode);
             gainNode.connect(audioCtx.destination);
 
-            mainOsc.start(now);
-            subOsc.start(now);
-            mainOsc.stop(now + duration);
-            subOsc.stop(now + duration);
+            mainOsc.start(startAt);
+            subOsc.start(startAt);
+            mainOsc.stop(startAt + duration);
+            subOsc.stop(startAt + duration);
+        };
+
+        ensureAudio.then(() => {
+            const now = audioCtx.currentTime;
+            const REPEAT_COUNT = 7;
+            const REPEAT_INTERVAL = 1; // seconds between blasts; ~7s of alarm total
+
+            for (let i = 0; i < REPEAT_COUNT; i++) {
+                scheduleBlast(now + i * REPEAT_INTERVAL);
+            }
         }).catch(() => { });
     }, [getAudioContext]);
 
