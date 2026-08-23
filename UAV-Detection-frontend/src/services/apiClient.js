@@ -1,8 +1,10 @@
 export async function requestJson(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
+
   const response = await fetch(path, {
     ...options,
     headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...options.headers,
     },
   });
