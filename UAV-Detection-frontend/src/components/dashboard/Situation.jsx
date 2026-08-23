@@ -57,7 +57,7 @@ const formatDateTime = (isoString) => {
     if (!isoString) return null;
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return null;
-    return d.toLocaleString("th-TH");
+    return d.toLocaleString("th-TH", { timeZone: "Asia/Bangkok" });
 };
 
 export function Situation({ detectingCameras = [], cameras = [], permissionMap = {}, handleCameraSelect }) {

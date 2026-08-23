@@ -73,7 +73,7 @@ const createBasePopupContent = (base, live) => `
         </div>
         
         <div style="margin-top: 8px; font-size: 9px; color: #475569; text-align: center; letter-spacing: 1px;">
-            ${live?.timestamp ? `อัพเดตล่าสุด: ${new Date(live.timestamp).toLocaleString('th-TH')}` : (base.last_update ? `อัพเดตล่าสุด: ${new Date(base.last_update).toLocaleString('th-TH')}` : 'ไม่พบข้อมูลอัพเดตล')}
+            ${live?.timestamp ? `อัพเดตล่าสุด: ${new Date(live.timestamp).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}` : (base.last_update ? `อัพเดตล่าสุด: ${new Date(base.last_update).toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })}` : 'ไม่พบข้อมูลอัพเดตล')}
         </div>
     </div>
 `;

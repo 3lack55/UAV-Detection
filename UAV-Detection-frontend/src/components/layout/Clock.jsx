@@ -8,5 +8,5 @@ export default function Clock() {
         return () => clearInterval(timer); // อย่าลืมคลีนอัพ
     }, []);
 
-    return <span className="text-lg font-mono text-slate-300">{time.toLocaleTimeString('th-TH')}</span>;
+    return <span className="text-lg font-mono text-slate-300">{time.toLocaleTimeString('th-TH', { timeZone: 'Asia/Bangkok' })}</span>;
 }

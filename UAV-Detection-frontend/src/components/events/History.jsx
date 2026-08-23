@@ -53,7 +53,8 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
         if (!isoString) return '-';
         return new Date(isoString).toLocaleTimeString('th-TH', {
             day: '2-digit', month: '2-digit', year: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            timeZone: 'Asia/Bangkok'
         });
     };
 

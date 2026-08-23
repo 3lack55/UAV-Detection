@@ -30,7 +30,7 @@ const formatUptime = (seconds) => {
     return parts.join(" ");
 };
 
-const formatDate = (value) => (value ? new Date(value).toLocaleString("th-TH") : "-");
+const formatDate = (value) => (value ? new Date(value).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" }) : "-");
 
 function UsageBar({ percent }) {
     const value = Math.max(0, Math.min(100, Number(percent) || 0));
@@ -175,7 +175,7 @@ export default function SystemStatus() {
                 <div className="flex items-center gap-4">
                     <div className="text-xs text-slate-400 flex flex-col sm:items-end">
                         <span className="flex items-center gap-1.5"><Clock size={12} /> อัปเดตล่าสุด</span>
-                        <span className="text-slate-200 font-medium">{lastUpdated ? lastUpdated.toLocaleTimeString("th-TH") : "-"}</span>
+                        <span className="text-slate-200 font-medium">{lastUpdated ? lastUpdated.toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok" }) : "-"}</span>
                     </div>
                     <button
                         onClick={() => fetchStatus(false)}

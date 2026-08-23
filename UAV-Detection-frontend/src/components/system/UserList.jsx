@@ -77,7 +77,7 @@ function ProfileModal({ user: targetUser, open, onClose, apiBase }) {
                         <div className="profile-row">
                             <span className="profile-row-label">สมัครเมื่อ</span>
                             <span className="profile-row-value">
-                                {new Date(targetUser.created_at).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}
+                                {new Date(targetUser.created_at).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Bangkok" })}
                             </span>
                         </div>
                     )}
@@ -507,7 +507,7 @@ export default function UserList({ search, setSearch, roleFilter, setRoleFilter,
                                         </span>
                                         {u.created_at && (
                                             <span className="ul-date">
-                                                {new Date(u.created_at).toLocaleDateString("th-TH", { year: "2-digit", month: "short", day: "numeric" })}
+                                                {new Date(u.created_at).toLocaleDateString("th-TH", { year: "2-digit", month: "short", day: "numeric", timeZone: "Asia/Bangkok" })}
                                             </span>
                                         )}
                                     </div>
