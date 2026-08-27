@@ -13,7 +13,7 @@ eventRouter.post("/createEvent", async (req, res) => {
 
     const query = "INSERT INTO events (camera_id, start_time) VALUES (?, ?)";
     try {
-        const result = await doQuery(query, [cameraId, startTime || new Date()]);
+        const result = await doQuery(query, [cameraId, new Date()]);
         res.status(201).json({
             success: true,
             message: "Event created successfully.",

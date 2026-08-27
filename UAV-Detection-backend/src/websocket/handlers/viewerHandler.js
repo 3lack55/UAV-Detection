@@ -2,6 +2,7 @@ import { cameraSessions, JWT_SECRET, controllerTimeout } from '../state.js';
 import { getOrCreateSession } from '../utils.js';
 import { broadcastToClients } from '../broadcast.js';
 import jwt from 'jsonwebtoken';
+import { WebSocket } from 'ws';
 
 function sendControlFeedback(ws, payload) {
     if (ws?.readyState === WebSocket.OPEN) {
