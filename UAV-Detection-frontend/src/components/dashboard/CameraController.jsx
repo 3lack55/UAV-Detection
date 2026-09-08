@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, memo } from 'react';
+import { useEffect, useCallback, useState, useRef, memo } from 'react';
 import {
   Camera,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
@@ -6,10 +6,19 @@ import {
   Lock,
   AlertCircle,
   CheckCircle2,
-  LoaderCircle
+  LoaderCircle,
+  Video,
+  Power,
+  Move
 } from 'lucide-react';
 import { useStreamViewer } from '../../context/useStreamViewer';
 import { Supervisor } from '../stream/Supervisor';
+
+const RESOLUTION_PRESETS = [
+  { label: '854x480 (480p)', width: 854, height: 480 },
+  { label: '960x540', width: 960, height: 540 },
+  { label: '1280x720 (720p)', width: 1280, height: 720 },
+];
 
 const ControlBtn = memo(function ControlBtn({ children, className = '', onClick, disabled }) {
   return (
@@ -62,17 +71,67 @@ const HeadingReadout = memo(function HeadingReadout() {
 });
 
 function CameraControllerInner({ cameraID, permission = "", onControl, active = false, controllable = false }) {
+  const [panelSection, setPanelSection] = useState("ptz");
   const [controlTypes, setControlTypes] = useState("continuously");
   const [degree, setDegree] = useState(5);
   const [degreeInput, setDegreeInput] = useState("5");
   const [feedback, setFeedback] = useState(null);
   const [isSending, setIsSending] = useState(false);
+  const [resolution, setResolution] = useState(RESOLUTION_PRESETS[1]);
+  const [quality, setQuality] = useState(50);
+  const [qualityInput, setQualityInput] = useState("50");
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [confidence, setConfidence] = useState(30);
+  const [confidenceInput, setConfidenceInput] = useState("30");
+  const [frameSkip, setFrameSkip] = useState(8);
+  const [frameSkipInput, setFrameSkipInput] = useState("8");
   const streamViewer = useStreamViewer() || {};
   const serverFeedback = streamViewer.controlFeedback;
+  const metaData = streamViewer.metaData;
 
   const hasControl = permission === "admin" || permission === "operator";
   const isReady = hasControl && active;
   const controlsDisabled = !isReady || isSending;
+
+  const hasSyncedSettingsRef = useRef(false);
+
+  useEffect(() => {
+    hasSyncedSettingsRef.current = false;
+  }, [cameraID]);
+
+  useEffect(() => {
+    if (hasSyncedSettingsRef.current) return;
+
+    const streamConfig = metaData?.streamConfig;
+    const ai = metaData?.ai;
+    if (!streamConfig && !ai) return;
+
+    if (streamConfig) {
+      if (typeof streamConfig.width === 'number' && typeof streamConfig.height === 'number') {
+        const preset = RESOLUTION_PRESETS.find((p) => p.width === streamConfig.width && p.height === streamConfig.height);
+        setResolution(preset || { label: `${streamConfig.width}x${streamConfig.height}`, width: streamConfig.width, height: streamConfig.height });
+      }
+      if (typeof streamConfig.quality === 'number') {
+        setQuality(streamConfig.quality);
+        setQualityInput(String(streamConfig.quality));
+      }
+    }
+
+    if (ai) {
+      if (typeof ai.enabled === 'boolean') setAiEnabled(ai.enabled);
+      if (typeof ai.confidence === 'number') {
+        const pct = Math.round(ai.confidence * 100);
+        setConfidence(pct);
+        setConfidenceInput(String(pct));
+      }
+      if (typeof ai.frameSkip === 'number') {
+        setFrameSkip(ai.frameSkip);
+        setFrameSkipInput(String(ai.frameSkip));
+      }
+    }
+
+    hasSyncedSettingsRef.current = true;
+  }, [metaData]);
 
   const normalizeDegree = useCallback((value) => {
     const parsed = Number(value);
@@ -108,6 +167,102 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
     setFeedback(null);
   }, [normalizeDegree, degreeInput, degree]);
 
+  const normalizeQuality = useCallback((value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(100, Math.max(1, Math.round(parsed)));
+  }, []);
+
+  const updateQualityInput = useCallback((rawValue) => {
+    setQualityInput(String(rawValue));
+
+    const normalized = normalizeQuality(rawValue);
+    if (normalized === null) {
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 1–100' });
+      return;
+    }
+
+    setQuality(normalized);
+    setFeedback(null);
+  }, [normalizeQuality]);
+
+  const commitQuality = useCallback(() => {
+    const normalized = normalizeQuality(qualityInput);
+    if (normalized === null) {
+      setQualityInput(String(quality));
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 1–100' });
+      return;
+    }
+
+    setQuality(normalized);
+    setQualityInput(String(normalized));
+    setFeedback(null);
+  }, [normalizeQuality, qualityInput, quality]);
+
+  const normalizeConfidence = useCallback((value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(100, Math.max(0, Math.round(parsed)));
+  }, []);
+
+  const updateConfidenceInput = useCallback((rawValue) => {
+    setConfidenceInput(String(rawValue));
+
+    const normalized = normalizeConfidence(rawValue);
+    if (normalized === null) {
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 0–100' });
+      return;
+    }
+
+    setConfidence(normalized);
+    setFeedback(null);
+  }, [normalizeConfidence]);
+
+  const commitConfidence = useCallback(() => {
+    const normalized = normalizeConfidence(confidenceInput);
+    if (normalized === null) {
+      setConfidenceInput(String(confidence));
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 0–100' });
+      return;
+    }
+
+    setConfidence(normalized);
+    setConfidenceInput(String(normalized));
+    setFeedback(null);
+  }, [normalizeConfidence, confidenceInput, confidence]);
+
+  const normalizeFrameSkip = useCallback((value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(60, Math.max(1, Math.round(parsed)));
+  }, []);
+
+  const updateFrameSkipInput = useCallback((rawValue) => {
+    setFrameSkipInput(String(rawValue));
+
+    const normalized = normalizeFrameSkip(rawValue);
+    if (normalized === null) {
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 1–60' });
+      return;
+    }
+
+    setFrameSkip(normalized);
+    setFeedback(null);
+  }, [normalizeFrameSkip]);
+
+  const commitFrameSkip = useCallback(() => {
+    const normalized = normalizeFrameSkip(frameSkipInput);
+    if (normalized === null) {
+      setFrameSkipInput(String(frameSkip));
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข 1–60' });
+      return;
+    }
+
+    setFrameSkip(normalized);
+    setFrameSkipInput(String(normalized));
+    setFeedback(null);
+  }, [normalizeFrameSkip, frameSkipInput, frameSkip]);
+
   const handleCommand = useCallback(async (command) => {
     if (!hasControl) {
       setFeedback({ type: 'error', message: 'คุณไม่มีสิทธิ์ควบคุมกล้องนี้' });
@@ -138,6 +293,20 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
       setIsSending(false);
     }
   }, [hasControl, active, onControl]);
+
+  const handleApplyStreamSettings = useCallback(() => {
+    handleCommand({ controlType: 'stream_settings', width: resolution.width, height: resolution.height, quality });
+  }, [handleCommand, resolution, quality]);
+
+  const handleToggleAI = useCallback(() => {
+    const next = !aiEnabled;
+    setAiEnabled(next);
+    handleCommand({ controlType: 'ai_toggle', enabled: next });
+  }, [handleCommand, aiEnabled]);
+
+  const handleApplyAISettings = useCallback(() => {
+    handleCommand({ controlType: 'ai_settings', confidence: confidence / 100, frameSkip });
+  }, [handleCommand, confidence, frameSkip]);
 
   const feedbackStyles = {
     success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
@@ -202,6 +371,23 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
         </div>
       </div>
 
+      <div className="w-full flex border-b border-slate-700 bg-slate-800/30">
+        <button
+          type="button"
+          onClick={() => setPanelSection('ptz')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold uppercase tracking-widest transition ${panelSection === 'ptz' ? 'bg-slate-700/60 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:bg-slate-700/30'}`}
+        >
+          <Move className="w-3.5 h-3.5" /> ควบคุมกล้อง
+        </button>
+        <button
+          type="button"
+          onClick={() => setPanelSection('stream')}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold uppercase tracking-widest transition ${panelSection === 'stream' ? 'bg-slate-700/60 text-white border-b-2 border-blue-500' : 'text-slate-400 hover:bg-slate-700/30'}`}
+        >
+          <Video className="w-3.5 h-3.5" /> สตรีมและ AI
+        </button>
+      </div>
+
       <div className="flex items-center justify-center relative overflow-y-auto custom-scrollbar flex-1">
         {!isReady ? (
           <div className="absolute inset-0 z-20 bg-slate-900/40 backdrop-blur-[2px] flex flex-col items-center justify-center transition-all duration-500">
@@ -219,7 +405,7 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
               </div>
             </div>
           </div>
-        ) : (
+        ) : panelSection === 'ptz' ? (
           controllable ? (
             <div className="absolute top-0 left-0 right-0 flex items-center gap-2 px-4 py-2">
               <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">โหมด: </span>
@@ -257,9 +443,9 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
               </div>
             </div>
           )
-        )}
+        ) : null}
 
-        {controlTypes === 'continuously' && (
+        {panelSection === 'ptz' && controlTypes === 'continuously' && (
           <div className="w-full px-4 flex flex-col items-center justify-between gap-2">
             <div className="w-full flex items-center justify-between p-2">
               <span className="text-sm text-slate-400">องศาต่อการกด</span>
@@ -322,7 +508,7 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
           </div>
         )}
 
-        {controlTypes === 'absolutely' && (
+        {panelSection === 'ptz' && controlTypes === 'absolutely' && (
           <div className="flex items-center justify-center w-full h-full gap-4 mt-2">
             <div className={`transition-opacity duration-300 ${!isReady ? 'opacity-30' : 'opacity-100'}`}>
               <div className="grid grid-cols-5 grid-rows-5 gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
@@ -348,7 +534,130 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
           </div>
         )}
 
-        <HeadingReadout />
+        {panelSection === 'stream' && (isReady ? (
+          <div className="w-full h-full px-5 py-5 flex flex-col gap-5 overflow-y-auto custom-scrollbar">
+            <section className="flex flex-col gap-3">
+              <h3 className="text-[11px] uppercase tracking-[0.2em] text-slate-400">ความละเอียด &amp; คุณภาพ</h3>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-400">ความละเอียด</span>
+                <select
+                  value={resolution.label}
+                  onChange={(event) => {
+                    const preset = RESOLUTION_PRESETS.find((p) => p.label === event.target.value);
+                    if (preset) setResolution(preset);
+                  }}
+                  disabled={controlsDisabled}
+                  className="bg-slate-800 text-slate-300 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 text-xs rounded-md px-2 py-1.5 disabled:opacity-40"
+                >
+                  {(RESOLUTION_PRESETS.some((p) => p.label === resolution.label) ? RESOLUTION_PRESETS : [resolution, ...RESOLUTION_PRESETS]).map((preset) => (
+                    <option key={preset.label} value={preset.label}>{preset.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-400">คุณภาพ (1–100)</span>
+                <div className="flex gap-2 items-center">
+                  <button type="button" onClick={() => updateQualityInput(quality - 5)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Minus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                  <input
+                    type="text"
+                    value={qualityInput}
+                    onChange={(event) => updateQualityInput(event.target.value)}
+                    onBlur={commitQuality}
+                    onKeyDown={(event) => event.key === 'Enter' && commitQuality()}
+                    disabled={controlsDisabled}
+                    className="bg-slate-800 text-slate-400 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 w-14 text-center rounded-md py-1"
+                  />
+                  <button type="button" onClick={() => updateQualityInput(quality + 5)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Plus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleApplyStreamSettings}
+                disabled={controlsDisabled}
+                className="w-full text-xs font-semibold rounded-md py-2 bg-blue-600/30 border border-blue-500/40 text-blue-300 hover:bg-blue-600/50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                ส่งคำสั่งความละเอียด/คุณภาพ
+              </button>
+            </section>
+
+            <section className="flex flex-col gap-3 pt-4 border-t border-slate-700/60">
+              <h3 className="text-[11px] uppercase tracking-[0.2em] text-slate-400">ระบบ AI ตรวจจับ</h3>
+
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-400">เปิด/ปิดการตรวจจับ</span>
+                <button
+                  type="button"
+                  onClick={handleToggleAI}
+                  disabled={controlsDisabled}
+                  className={`flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest rounded-full px-3 py-1.5 border transition disabled:opacity-40 disabled:cursor-not-allowed
+                    ${aiEnabled ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300' : 'bg-slate-700/60 border-slate-600 text-slate-400'}`}
+                >
+                  <Power className="w-3 h-3" /> {aiEnabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                </button>
+              </div>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-400">Confidence (%)</span>
+                <div className="flex gap-2 items-center">
+                  <button type="button" onClick={() => updateConfidenceInput(confidence - 5)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Minus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                  <input
+                    type="text"
+                    value={confidenceInput}
+                    onChange={(event) => updateConfidenceInput(event.target.value)}
+                    onBlur={commitConfidence}
+                    onKeyDown={(event) => event.key === 'Enter' && commitConfidence()}
+                    disabled={controlsDisabled}
+                    className="bg-slate-800 text-slate-400 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 w-14 text-center rounded-md py-1"
+                  />
+                  <button type="button" onClick={() => updateConfidenceInput(confidence + 5)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Plus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+              </label>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-400" title="ประมวลผล AI ทุกกี่เฟรม (ยิ่งมากยิ่งเบา แต่ตรวจจับช้าลง)">Frame Skip</span>
+                <div className="flex gap-2 items-center">
+                  <button type="button" onClick={() => updateFrameSkipInput(frameSkip - 1)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Minus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                  <input
+                    type="text"
+                    value={frameSkipInput}
+                    onChange={(event) => updateFrameSkipInput(event.target.value)}
+                    onBlur={commitFrameSkip}
+                    onKeyDown={(event) => event.key === 'Enter' && commitFrameSkip()}
+                    disabled={controlsDisabled}
+                    className="bg-slate-800 text-slate-400 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 w-14 text-center rounded-md py-1"
+                  />
+                  <button type="button" onClick={() => updateFrameSkipInput(frameSkip + 1)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Plus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleApplyAISettings}
+                disabled={controlsDisabled}
+                className="w-full text-xs font-semibold rounded-md py-2 bg-blue-600/30 border border-blue-500/40 text-blue-300 hover:bg-blue-600/50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                ส่งคำสั่งตั้งค่า AI
+              </button>
+            </section>
+          </div>
+        ) : null)}
+
+        {panelSection === 'ptz' && <HeadingReadout />}
 
         {feedback && (
           <div className={`absolute top-1 right-1 z-30 flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-medium shadow-lg ${feedbackStyles[feedback.type] || feedbackStyles.info}`}>
