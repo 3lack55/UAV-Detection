@@ -7,12 +7,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Dependency & Build 
+# Dependency & Build
 **/node_modules/
 **/dist/
 **/dist-ssr/
 **/uploads/
 **/temp/
+**/__pycache__/
 *.local
 
 # Editor directories and files 
