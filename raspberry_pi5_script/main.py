@@ -64,6 +64,7 @@ ONVIF_PORT        = os.getenv("ONVIF_PORT")
 PTZ_ENABLED       = True
 max_pan_deg       = 180
 max_tilt_deg      = 45
+PTZ_POLL_INTERVAL = 3   # seconds between ONVIF GetStatus polls
 
 # ── Source (set one) ─────────────────────────────────────────────────────────
 USE_RTSP          = False
@@ -91,8 +92,10 @@ shared = {
     "latitude":  CAMERA_LATITUDE,
     "longitude": CAMERA_LONGITUDE,
     "heading":   0.0,
-    "current_pan": 0.0,
+    "current_pan": 0.0,   # real position, polled from camera via ONVIF GetStatus
     "current_tilt": 0.0,
+    "target_pan": 0.0,    # last commanded target, used as baseline for relative moves
+    "target_tilt": 0.0,
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -160,11 +163,23 @@ def ptz_absolute_move(ptz, token, pan_val: float, tilt_val: float, zoom_val: flo
             req.Position["Zoom"] = {"x": zoom_val}
 
         ptz.AbsoluteMove(req)
-        shared["current_pan"] = pan_val
-        shared["current_tilt"] = tilt_val
+        shared["target_pan"] = pan_val
+        shared["target_tilt"] = tilt_val
         print(f"Moving absolutely to Pan: {pan_val}, Tilt: {tilt_val}")
     except Exception as exc:
         print(f"Absolute Move error: {exc}")
+
+def ptz_status_worker(ptz, token):
+    """Poll the camera's real position over ONVIF and keep `shared` current_pan/tilt in sync."""
+    if ptz is None:
+        return
+    print("PTZ status worker started")
+    while True:
+        pan_deg, tilt_deg = get_ptz_status(ptz, token)
+        if pan_deg is not None and tilt_deg is not None:
+            shared["current_pan"] = pan_deg
+            shared["current_tilt"] = tilt_deg
+        time.sleep(PTZ_POLL_INTERVAL)
 
 def apply_stream_settings(command):
     global OUT_W, OUT_H, QUALITY
@@ -209,8 +224,8 @@ def ptz_worker(ptz, token, command):
         elif ctrl_type == "continuously":
             direction = command.get("direction")
             degree = command.get("deg")
-            pan = shared["current_pan"]
-            tilt = shared["current_tilt"]
+            pan = shared["target_pan"]
+            tilt = shared["target_tilt"]
             
             if direction == "left":
                 ptz_absolute_move(ptz, token, pan - degree, tilt)
@@ -626,6 +641,11 @@ async def main():
         print(f"Compass unavailable — heading set to {shared['heading']}")
 
     ptz, ptz_token = init_ptz()
+
+    if ptz is not None:
+        print("Resetting camera to home position (pan=0, tilt=0)…")
+        ptz_absolute_move(ptz, ptz_token, 0.0, 0.0)
+        loop.run_in_executor(pool, ptz_status_worker, ptz, ptz_token)
 
     try:
         while True:

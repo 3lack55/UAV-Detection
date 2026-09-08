@@ -63,9 +63,9 @@ const HeadingReadout = memo(function HeadingReadout() {
 
   return (
     <div className="absolute bottom-0 w-full flex items-center justify-between p-1 z-10">
-      <span className="text-xs text-slate-400">ทิศทาง: {handleHeadingUpdate('installFace', heading?.installFace)}</span>
-      <span className="text-xs text-slate-400">ระนาบ: {handleHeadingUpdate('pan', heading?.currentPan)}</span>
-      <span className="text-xs text-slate-400">ก้มเงย: {handleHeadingUpdate('tilt', heading?.currentTilt)}</span>
+      <span className="text-xs text-slate-400">ทิศทาง: {handleHeadingUpdate('installFace', heading?.installFace?.toFixed(0))}</span>
+      <span className="text-xs text-slate-400">ระนาบ: {handleHeadingUpdate('pan', heading?.currentPan?.toFixed(0))}</span>
+      <span className="text-xs text-slate-400">ก้มเงย: {handleHeadingUpdate('tilt', heading?.currentTilt?.toFixed(0))}</span>
     </div>
   );
 });
