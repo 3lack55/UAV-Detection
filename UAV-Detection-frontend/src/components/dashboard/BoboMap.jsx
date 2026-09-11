@@ -171,19 +171,24 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
                 const camId = camData?.camera?.camera_id;
                 if (camId === undefined || camId === null) return;
 
+                const lat = camData.camera?.lat;
+                const lon = camData.camera?.lon;
+
                 parsed[String(camId)] = {
                     pan: camData.heading?.currentPan ?? 0,
                     tilt: camData.heading?.currentTilt ?? 0,
                     installFace: camData.heading?.installFace ?? 0,
                     timestamp: camData.timestamp || null,
+                    lat: typeof lat === 'number' && !Number.isNaN(lat) ? lat : null,
+                    lon: typeof lon === 'number' && !Number.isNaN(lon) ? lon : null,
                 };
             });
 
             setLiveMeta(parsed);
         };
 
-        readMetaData(); 
-        const intervalId = setInterval(readMetaData, 3000);
+        readMetaData();
+        const intervalId = setInterval(readMetaData, 1000);
 
         return () => clearInterval(intervalId);
     }, [allMetaDataRef]);
@@ -194,9 +199,13 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
             const installFace = live ? live.installFace : b.heading;
             const pan = live ? live.pan : 0;
             const currentHeading = normalizeAngle(installFace + pan);
+            const lat = live?.lat ?? b.lat;
+            const lng = live?.lon ?? b.lng;
 
             return {
                 ...b,
+                lat,
+                lng,
                 installFace: normalizeAngle(installFace),
                 currentHeading,
                 live: live ? { ...live, installFace: normalizeAngle(installFace), currentHeading } : null,
@@ -262,22 +271,32 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
     const handleResetView = useCallback(() => {
         if (mapInstance.current && selectedCamera && selectedCamera !== 'None') {
             const targetCameraID = parseInt(selectedCamera);
-            const targetCamera = basePosition.find(cam => cam.id === targetCameraID);
+            const targetCamera = enrichedBasePosition.find(cam => cam.id === targetCameraID);
             if (targetCamera) {
                 mapInstance.current.flyTo([targetCamera.lat, targetCamera.lng], 17, { duration: 1.5 });
             }
         }
-    }, [selectedCamera, basePosition]);
+    }, [selectedCamera, enrichedBasePosition]);
 
+    // Only auto-fly when the user actually picks a different camera — not every
+    // time enrichedBasePosition refreshes underneath (e.g. a camera_changed
+    // event that arrived while the tab was in the background). Re-running on
+    // every position refresh was snapping the view back to center on stale data.
+    const lastFlownCameraRef = useRef(null);
     useEffect(() => {
-        if (!mapInstance.current || !selectedCamera || selectedCamera === 'None') return;
+        if (!mapInstance.current || !selectedCamera || selectedCamera === 'None') {
+            lastFlownCameraRef.current = null;
+            return;
+        }
+        if (lastFlownCameraRef.current === selectedCamera) return;
 
         const targetCameraID = parseInt(selectedCamera);
-        const targetCamera = basePosition.find(cam => cam.id === targetCameraID);
+        const targetCamera = enrichedBasePosition.find(cam => cam.id === targetCameraID);
         if (targetCamera) {
             mapInstance.current.flyTo([targetCamera.lat, targetCamera.lng], 17, { duration: 0 });
+            lastFlownCameraRef.current = selectedCamera;
         }
-    }, [selectedCamera, basePosition]);
+    }, [selectedCamera, enrichedBasePosition]);
 
     useEffect(() => {
         if (!mapInstance.current || !window.L || !mapReady) return;

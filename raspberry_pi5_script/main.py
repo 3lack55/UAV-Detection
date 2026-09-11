@@ -85,7 +85,8 @@ GPS_BAUDRATE      = 9600
 COMPASS_ADDR      = 0x2C
 COMPASS_X_OFFSET  = -88.5
 COMPASS_Y_OFFSET  = -286.5
-SENSOR_INTERVAL   = 10          # seconds between reads
+SENSOR_INTERVAL   = 3          # seconds between compass reads
+GPS_INTERVAL      = 3           # seconds between GPS reads (matches ~1Hz NMEA output)
 
 # ── Shared state (written by sensor workers, read by stream sender) ────────────
 shared = {
@@ -247,17 +248,34 @@ GPS_CHECK_INTERVAL = 5  # seconds per attempt
 
 
 def check_gps() -> bool:
-    """Try opening the GPS serial port and reading valid NMEA data, with retries."""
+    """Try reading a valid GPS fix from the serial port, with retries.
+
+    If a fix shows up during the check, `shared` is updated immediately so
+    the very first frames/auth message already carry real coordinates
+    instead of waiting for gps_worker's first pass.
+    """
     for attempt in range(1, GPS_CHECK_RETRIES + 1):
         try:
             with serial.Serial(GPS_PORT, baudrate=GPS_BAUDRATE, timeout=GPS_CHECK_INTERVAL) as ser:
                 deadline = time.monotonic() + GPS_CHECK_INTERVAL
                 while time.monotonic() < deadline:
                     line = ser.readline().decode("utf-8", errors="ignore").strip()
-                    if line.startswith("$GP") or line.startswith("$GN"):
-                        print(f"GPS check OK on attempt {attempt}/{GPS_CHECK_RETRIES} ({line[:20]}…)")
+                    if not (line.startswith("$GPRMC") or line.startswith("$GPGGA")):
+                        continue
+                    try:
+                        msg = pynmea2.parse(line)
+                    except pynmea2.ParseError:
+                        continue
+                    has_fix = (msg.gps_qual > 0) if hasattr(msg, "gps_qual") else (msg.status == "A")
+                    if has_fix:
+                        shared["latitude"]  = msg.latitude
+                        shared["longitude"] = msg.longitude
+                        print(
+                            f"GPS check OK on attempt {attempt}/{GPS_CHECK_RETRIES} "
+                            f"(fix: {msg.latitude}, {msg.longitude})"
+                        )
                         return True
-            print(f"GPS check attempt {attempt}/{GPS_CHECK_RETRIES}: no NMEA data")
+            print(f"GPS check attempt {attempt}/{GPS_CHECK_RETRIES}: no fix yet")
         except Exception as exc:
             print(f"GPS check attempt {attempt}/{GPS_CHECK_RETRIES} FAILED: {exc}")
 
@@ -265,18 +283,24 @@ def check_gps() -> bool:
             print(f"Retrying GPS in {GPS_CHECK_INTERVAL}s…")
             time.sleep(GPS_CHECK_INTERVAL)
 
-    print(f"GPS not responding after {GPS_CHECK_RETRIES} attempts")
+    print(f"No GPS fix after {GPS_CHECK_RETRIES} attempts — gps_worker will keep retrying in the background")
     return False
 
 
 def check_compass() -> bool:
-    """Try initializing the compass over I2C and reading the status register."""
+    """Try initializing the compass over I2C and reading the heading, with retries.
+
+    If a heading reading is ready during the check, `shared["heading"]` is
+    updated immediately for the same reason as check_gps() above.
+    """
     try:
         bus = smbus2.SMBus(1)
         _init_compass(bus)
         status = bus.read_byte_data(COMPASS_ADDR, 0x09)
+        if status & 0x01:
+            shared["heading"] = _read_heading(bus)
         bus.close()
-        print(f"Compass check OK (status=0x{status:02X})")
+        print(f"Compass check OK (status=0x{status:02X}, heading={shared['heading']:.1f}°)")
         return True
     except Exception as exc:
         print(f"Compass check FAILED: {exc}")
@@ -296,7 +320,7 @@ def gps_worker():
         if now < next_read:
             time.sleep(0.5)
             continue
-        next_read = now + SENSOR_INTERVAL
+        next_read = now + GPS_INTERVAL
 
         line = ser.readline().decode("utf-8", errors="ignore")
         if not (line.startswith("$GPRMC") or line.startswith("$GPGGA")):
@@ -622,23 +646,23 @@ async def main():
     pool = ThreadPoolExecutor(max_workers=8)
     loop = asyncio.get_running_loop()
 
-    # ── Sensor startup checks ────────────────────────────────────────────────
+    # ── Sensor startup checks (diagnostic only — workers always start below,
+    # since a cold GPS fix or a transient I2C error at boot can easily take
+    # longer than this one-shot check, and the workers must keep retrying
+    # instead of leaving `shared` pinned to defaults for the whole session) ──
     gps_ok = await loop.run_in_executor(pool, check_gps)
-    compass_ok = await loop.run_in_executor(pool, check_compass)
-
-    if gps_ok:
-        loop.run_in_executor(pool, gps_worker)
-    else:
+    if not gps_ok:
         print(
-            f"GPS unavailable — using defaults: "
+            f"GPS not ready at startup — using defaults for now: "
             f"lat={shared['latitude']}, lon={shared['longitude']}"
         )
+    loop.run_in_executor(pool, gps_worker)
 
-    if compass_ok:
-        loop.run_in_executor(pool, compass_worker)
-    else:
+    compass_ok = await loop.run_in_executor(pool, check_compass)
+    if not compass_ok:
         shared["heading"] = 0.0
-        print(f"Compass unavailable — heading set to {shared['heading']}")
+        print(f"Compass not ready at startup — heading set to {shared['heading']} for now")
+    loop.run_in_executor(pool, compass_worker)
 
     ptz, ptz_token = init_ptz()
 
