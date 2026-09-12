@@ -8,8 +8,8 @@ const middleware = express();
 middleware.use(cors());
 middleware.use(logger);
 // middleware.use(protect);
-middleware.use(express.json());
-middleware.use(express.urlencoded({extended: true}));
+middleware.use(express.json({ limit: '10mb' }));
+middleware.use(express.urlencoded({ extended: true, limit: '10mb' }));
 middleware.use('/uploads', express.static('uploads'));
 
 export default middleware;
