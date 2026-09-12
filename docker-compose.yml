@@ -3,6 +3,7 @@ services:
     image: mysql:5.7
     container_name: uav_mysql
     restart: unless-stopped
+    command: --event-scheduler=ON
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-uav_detection}

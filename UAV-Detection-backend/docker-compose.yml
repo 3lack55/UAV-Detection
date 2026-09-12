@@ -3,6 +3,7 @@ services:
   bobo_mysql:
     image: mysql:5.7
     container_name: bobo_uav_sql
+    command: --event-scheduler=ON
     ports:
       - "13306:3306"
     environment:

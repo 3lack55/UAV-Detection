@@ -2,12 +2,14 @@ import { createServer } from 'http';
 import dotenv from 'dotenv';
 import app from './app.js';
 import { initializeWebSocket } from './socket.js';
+import { startImageRetentionJob } from './src/jobs/imageRetentionJob.js';
 
 dotenv.config();
 
 const server = createServer(app);
 
 initializeWebSocket(server);
+startImageRetentionJob();
 
 const PORT = process.env.PORT || 3001 || 3002;
 
