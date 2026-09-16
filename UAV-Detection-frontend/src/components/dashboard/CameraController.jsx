@@ -35,6 +35,18 @@ const ControlBtn = memo(function ControlBtn({ children, className = '', onClick,
   );
 });
 
+const directionLabels = (degree) => {
+  if (degree >= 337.5 || degree < 22.5) return `N (${degree})`;
+  if (degree >= 22.5 && degree < 67.5) return `NE (${degree})`;
+  if (degree >= 67.5 && degree < 112.5) return `E (${degree})`;
+  if (degree >= 112.5 && degree < 157.5) return `SE (${degree})`;
+  if (degree >= 157.5 && degree < 202.5) return `S (${degree})`;
+  if (degree >= 202.5 && degree < 247.5) return `SW (${degree})`;
+  if (degree >= 247.5 && degree < 292.5) return `W (${degree})`;
+  if (degree >= 292.5 && degree < 337.5) return `NW (${degree})`;
+  return "ไม่ทราบทิศทาง";
+};
+
 const HeadingReadout = memo(function HeadingReadout() {
   const streamViewer = useStreamViewer() || {};
   const heading = streamViewer.metaData?.heading;
@@ -57,7 +69,7 @@ const HeadingReadout = memo(function HeadingReadout() {
         return `ตรง 0°`;
       }
     } else if (type === 'installFace') {
-      return `${value}°`;
+      return `${directionLabels(value)}`;
     }
   };
 
@@ -85,6 +97,8 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
   const [confidenceInput, setConfidenceInput] = useState("30");
   const [frameSkip, setFrameSkip] = useState(8);
   const [frameSkipInput, setFrameSkipInput] = useState("8");
+  const [headingOffset, setHeadingOffset] = useState(0);
+  const [headingOffsetInput, setHeadingOffsetInput] = useState("0");
   const streamViewer = useStreamViewer() || {};
   const serverFeedback = streamViewer.controlFeedback;
   const metaData = streamViewer.metaData;
@@ -104,7 +118,8 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
 
     const streamConfig = metaData?.streamConfig;
     const ai = metaData?.ai;
-    if (!streamConfig && !ai) return;
+    const heading = metaData?.heading;
+    if (!streamConfig && !ai && !heading) return;
 
     if (streamConfig) {
       if (typeof streamConfig.width === 'number' && typeof streamConfig.height === 'number') {
@@ -128,6 +143,11 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
         setFrameSkip(ai.frameSkip);
         setFrameSkipInput(String(ai.frameSkip));
       }
+    }
+
+    if (heading && typeof heading.offsetDeg === 'number') {
+      setHeadingOffset(heading.offsetDeg);
+      setHeadingOffsetInput(String(heading.offsetDeg));
     }
 
     hasSyncedSettingsRef.current = true;
@@ -263,6 +283,38 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
     setFeedback(null);
   }, [normalizeFrameSkip, frameSkipInput, frameSkip]);
 
+  const normalizeHeadingOffset = useCallback((value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.min(180, Math.max(-180, Math.round(parsed)));
+  }, []);
+
+  const updateHeadingOffsetInput = useCallback((rawValue) => {
+    setHeadingOffsetInput(String(rawValue));
+
+    const normalized = normalizeHeadingOffset(rawValue);
+    if (normalized === null) {
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข -180–180 องศา' });
+      return;
+    }
+
+    setHeadingOffset(normalized);
+    setFeedback(null);
+  }, [normalizeHeadingOffset]);
+
+  const commitHeadingOffset = useCallback(() => {
+    const normalized = normalizeHeadingOffset(headingOffsetInput);
+    if (normalized === null) {
+      setHeadingOffsetInput(String(headingOffset));
+      setFeedback({ type: 'error', message: 'กรุณากรอกตัวเลข -180–180 องศา' });
+      return;
+    }
+
+    setHeadingOffset(normalized);
+    setHeadingOffsetInput(String(normalized));
+    setFeedback(null);
+  }, [normalizeHeadingOffset, headingOffsetInput, headingOffset]);
+
   const handleCommand = useCallback(async (command) => {
     if (!hasControl) {
       setFeedback({ type: 'error', message: 'คุณไม่มีสิทธิ์ควบคุมกล้องนี้' });
@@ -307,6 +359,10 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
   const handleApplyAISettings = useCallback(() => {
     handleCommand({ controlType: 'ai_settings', confidence: confidence / 100, frameSkip });
   }, [handleCommand, confidence, frameSkip]);
+
+  const handleApplyHeadingOffset = useCallback(() => {
+    handleCommand({ controlType: 'heading_offset', offsetDeg: headingOffset });
+  }, [handleCommand, headingOffset]);
 
   const feedbackStyles = {
     success: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
@@ -652,6 +708,40 @@ function CameraControllerInner({ cameraID, permission = "", onControl, active = 
                 className="w-full text-xs font-semibold rounded-md py-2 bg-blue-600/30 border border-blue-500/40 text-blue-300 hover:bg-blue-600/50 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 ส่งคำสั่งตั้งค่า AI
+              </button>
+            </section>
+
+            <section className="flex flex-col gap-3 pt-4 border-t border-slate-700/60">
+              <h3 className="text-[11px] uppercase tracking-[0.2em] text-slate-400">เข็มทิศ</h3>
+
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-xs text-slate-400" title="ชดเชยค่าเข็มทิศเมื่อทิศทางที่อ่านได้คลาดเคลื่อนจากทิศจริงของกล้อง">ชดเชยทิศทาง (°)</span>
+                <div className="flex gap-2 items-center">
+                  <button type="button" onClick={() => updateHeadingOffsetInput(headingOffset - 1)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Minus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                  <input
+                    type="text"
+                    value={headingOffsetInput}
+                    onChange={(event) => updateHeadingOffsetInput(event.target.value)}
+                    onBlur={commitHeadingOffset}
+                    onKeyDown={(event) => event.key === 'Enter' && commitHeadingOffset()}
+                    disabled={controlsDisabled}
+                    className="bg-slate-800 text-slate-400 border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 w-14 text-center rounded-md py-1"
+                  />
+                  <button type="button" onClick={() => updateHeadingOffsetInput(headingOffset + 1)} disabled={controlsDisabled} className="disabled:opacity-40 disabled:cursor-not-allowed">
+                    <Plus className="w-4 h-4 cursor-pointer text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+              </label>
+
+              <button
+                type="button"
+                onClick={handleApplyHeadingOffset}
+                disabled={controlsDisabled}
+                className="w-full text-xs font-semibold rounded-md py-2 bg-blue-600/30 border border-blue-500/40 text-blue-300 hover:bg-blue-600/50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                ส่งคำสั่งชดเชยทิศทาง
               </button>
             </section>
           </div>

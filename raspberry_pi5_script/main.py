@@ -82,11 +82,19 @@ AI_ENABLED        = True
 # ── GPS / Compass ─────────────────────────────────────────────────────────────
 GPS_PORT          = "/dev/ttyAMA0"
 GPS_BAUDRATE      = 9600
-COMPASS_ADDR      = 0x2C
-COMPASS_X_OFFSET  = -88.5
-COMPASS_Y_OFFSET  = -286.5
+COMPASS_X_OFFSET  = float(os.getenv("COMPASS_X_OFFSET", "-88.5"))   # hard-iron calibration — retune when swapping sensor units/models
+COMPASS_Y_OFFSET  = float(os.getenv("COMPASS_Y_OFFSET", "-286.5"))
+HEADING_OFFSET_DEG = float(os.getenv("HEADING_OFFSET_DEG", "0"))  # corrects compass mounting misalignment; adjustable at runtime from the web UI
 SENSOR_INTERVAL   = 3          # seconds between compass reads
 GPS_INTERVAL      = 3           # seconds between GPS reads (matches ~1Hz NMEA output)
+
+# QMC5883P and QMC5883L expose different I2C addresses and register layouts.
+# COMPASS_MODEL forces one ("QMC5883P" / "QMC5883L"); "auto" (default) probes both at startup.
+COMPASS_MODEL_OVERRIDE = os.getenv("COMPASS_MODEL", "auto").strip().upper()
+COMPASS_PROFILES = {
+    "QMC5883P": {"addr": 0x2C, "data_reg": 0x01, "status_reg": 0x09},
+    "QMC5883L": {"addr": 0x0D, "data_reg": 0x00, "status_reg": 0x06},
+}
 
 # ── Shared state (written by sensor workers, read by stream sender) ────────────
 shared = {
@@ -216,6 +224,13 @@ def apply_ai_settings(command):
         FRAME_SKIP = max(1, min(60, int(frame_skip)))
         print(f"AI frame skip set to {FRAME_SKIP}")
 
+def apply_heading_offset(command):
+    global HEADING_OFFSET_DEG
+    offset = command.get("offsetDeg")
+    if isinstance(offset, (int, float)):
+        HEADING_OFFSET_DEG = max(-180.0, min(180.0, float(offset)))
+        print(f"Heading offset set to {HEADING_OFFSET_DEG}°")
+
 def ptz_worker(ptz, token, command):
     ctrl_type = command.get("controlType")
     
@@ -296,11 +311,11 @@ def check_compass() -> bool:
     try:
         bus = smbus2.SMBus(1)
         _init_compass(bus)
-        status = bus.read_byte_data(COMPASS_ADDR, 0x09)
+        status = bus.read_byte_data(_compass_profile["addr"], _compass_profile["status_reg"])
         if status & 0x01:
             shared["heading"] = _read_heading(bus)
         bus.close()
-        print(f"Compass check OK (status=0x{status:02X}, heading={shared['heading']:.1f}°)")
+        print(f"Compass check OK ({_compass_profile['name']}, status=0x{status:02X}, heading={shared['heading']:.1f}°)")
         return True
     except Exception as exc:
         print(f"Compass check FAILED: {exc}")
@@ -340,14 +355,54 @@ def gps_worker():
 # Compass worker (blocking, runs in thread)
 # ─────────────────────────────────────────────────────────────────────────────
 
+_compass_profile = None  # detected/selected {"name", "addr", "data_reg", "status_reg"}, set by _init_compass()
+
+
+def _init_qmc5883p(bus: smbus2.SMBus, addr: int):
+    bus.write_byte_data(addr, 0x29, 0x06)
+    bus.write_byte_data(addr, 0x0B, 0x08)
+    bus.write_byte_data(addr, 0x0A, 0xCD)
+
+
+def _init_qmc5883l(bus: smbus2.SMBus, addr: int):
+    bus.write_byte_data(addr, 0x0B, 0x01)  # SET/RESET period — must be 0x01
+    bus.write_byte_data(addr, 0x09, 0x1D)  # Control1: OSR=512, RNG=8G, ODR=200Hz, continuous mode
+
+
+_COMPASS_INIT_FUNCS = {
+    "QMC5883P": _init_qmc5883p,
+    "QMC5883L": _init_qmc5883l,
+}
+
+
 def _init_compass(bus: smbus2.SMBus):
-    bus.write_byte_data(COMPASS_ADDR, 0x29, 0x06)
-    bus.write_byte_data(COMPASS_ADDR, 0x0B, 0x08)
-    bus.write_byte_data(COMPASS_ADDR, 0x0A, 0xCD)
+    """Initialize the compass, auto-detecting QMC5883P vs QMC5883L by I2C address unless
+    COMPASS_MODEL forces one. A previously detected model (if any) is tried first."""
+    global _compass_profile
+
+    if COMPASS_MODEL_OVERRIDE in COMPASS_PROFILES:
+        candidates = [COMPASS_MODEL_OVERRIDE]
+    elif _compass_profile is not None:
+        candidates = [_compass_profile["name"]] + [n for n in COMPASS_PROFILES if n != _compass_profile["name"]]
+    else:
+        candidates = list(COMPASS_PROFILES)
+
+    errors = []
+    for name in candidates:
+        profile = COMPASS_PROFILES[name]
+        try:
+            _COMPASS_INIT_FUNCS[name](bus, profile["addr"])
+            _compass_profile = {"name": name, **profile}
+            print(f"Compass detected: {name} (addr=0x{profile['addr']:02X})")
+            return
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+
+    raise RuntimeError(f"No supported compass found ({'; '.join(errors)})")
 
 
 def _read_heading(bus: smbus2.SMBus) -> float:
-    data = bus.read_i2c_block_data(COMPASS_ADDR, 0x01, 6)
+    data = bus.read_i2c_block_data(_compass_profile["addr"], _compass_profile["data_reg"], 6)
     x = data[0] | (data[1] << 8)
     y = data[2] | (data[3] << 8)
 
@@ -357,7 +412,7 @@ def _read_heading(bus: smbus2.SMBus) -> float:
     heading = math.atan2(y - COMPASS_Y_OFFSET, x - COMPASS_X_OFFSET)
     if heading < 0:
         heading += 2 * math.pi
-    return math.degrees(heading)
+    return (math.degrees(heading) + HEADING_OFFSET_DEG) % 360
 
 
 def compass_worker():
@@ -367,9 +422,9 @@ def compass_worker():
         print("Compass worker started")
     except Exception as exc:
         print(f"Failed to initialize Compass: {exc}")
-        shared["heading"] = -999.0
-        return 
-    
+        shared["heading"] = 0.0
+        return
+
     next_read = 0.0
     while True:
         now = time.monotonic()
@@ -378,7 +433,7 @@ def compass_worker():
             continue
         next_read = now + SENSOR_INTERVAL
         try:
-            status = bus.read_byte_data(COMPASS_ADDR, 0x09)
+            status = bus.read_byte_data(_compass_profile["addr"], _compass_profile["status_reg"])
             if status & 0x01:
                 shared["heading"] = _read_heading(bus)
         except Exception as exc:
@@ -452,7 +507,7 @@ def build_packet(detections: np.ndarray | None, jpg_bytes: bytes) -> bytes:
     meta = orjson.dumps({
         "uavs":       uavs,
         "camera":     {"camera_id": CAMERA_ID, "lat": shared["latitude"], "lon": shared["longitude"]},
-        "heading":    {"installFace": shared["heading"], "currentPan": shared["current_pan"], "currentTilt": shared["current_tilt"]},
+        "heading":    {"installFace": shared["heading"], "currentPan": shared["current_pan"], "currentTilt": shared["current_tilt"], "offsetDeg": HEADING_OFFSET_DEG},
         "image_size": {"model_size": [INFER_W, INFER_H]},
         "controllable":  PTZ_ENABLED,
         "streamConfig": {"width": OUT_W, "height": OUT_H, "quality": QUALITY},
@@ -552,6 +607,8 @@ async def receive_commands(ws, pool, ptz, token):
                     apply_ai_toggle(cmd)
                 elif ctrl_type == "ai_settings":
                     apply_ai_settings(cmd)
+                elif ctrl_type == "heading_offset":
+                    apply_heading_offset(cmd)
     except websockets.exceptions.ConnectionClosed:
         pass
 
@@ -684,7 +741,7 @@ async def main():
                         "token": jwt_token,
                         "metaData": {
                             "camera": {"camera_id": CAMERA_ID, "lat": shared["latitude"], "lon": shared["longitude"]},
-                            "heading": {"installFace": shared["heading"], "currentPan": shared["current_pan"], "currentTilt": shared["current_tilt"]},
+                            "heading": {"installFace": shared["heading"], "currentPan": shared["current_pan"], "currentTilt": shared["current_tilt"], "offsetDeg": HEADING_OFFSET_DEG},
                             "controllable": PTZ_ENABLED
                         }
                     }))
