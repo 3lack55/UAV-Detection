@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
-import { Map, Satellite } from 'lucide-react';
+import { Map as MapIcon, Satellite } from 'lucide-react';
 import { useWebSocket } from "../../context/useWebSocket";
 import { useLeafletLoader } from "../../hooks/useLeafletLoader";
 
@@ -83,7 +83,7 @@ const MapControls = memo(({ mapType, setMapType, onReset }) => {
         <>
             <div className="absolute top-4 right-4 rounded-full max-sm:rounded-lg border border-slate-700 bg-slate-900/90 backdrop-blur-lg shadow-[0_20px_40px_rgba(15,23,42,0.25)] z-[400] overflow-hidden flex gap-1 p-1 max-sm:p-0 max-sm:block ">
                 <button onClick={() => setMapType('street')} className={`flex max-sm:w-full max-sm:rounded-none items-center gap-2 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] transition-all duration-200 rounded-full ${mapType === 'street' ? 'bg-slate-700/95 text-slate-100 ring-1 ring-slate-500 max-sm:ring-0' : 'bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-slate-100'}`}>
-                    <Map className="w-4 h-4" /> แผนที่
+                    <MapIcon className="w-4 h-4" /> แผนที่
                 </button>
                 <button onClick={() => setMapType('satellite')} className={`flex max-sm:w-full max-sm:rounded-none items-center gap-2 px-4 py-2 text-xs font-medium uppercase tracking-[0.18em] transition-all duration-200 rounded-full ${mapType === 'satellite' ? 'bg-slate-700/95 text-slate-100 ring-1 ring-slate-500 max-sm:ring-0' : 'bg-slate-900/90 text-slate-300 hover:bg-slate-800 hover:text-slate-100'}`}>
                     <Satellite className="w-4 h-4" /> ดาวเทียม
@@ -157,6 +157,7 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
     const initialMapTypeRef = useRef(mapType);
     const basePosition = useMemo(() => base.length > 0 ? base : [], [base]);
     const baseLayersRef = useRef([]);
+    const markerMapRef = useRef(new Map());
 
     const { allMetaDataRef } = useWebSocket();
     const [liveMeta, setLiveMeta] = useState({});
@@ -299,13 +300,49 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
     }, [selectedCamera, enrichedBasePosition]);
 
     useEffect(() => {
-        if (!mapInstance.current || !window.L || !mapReady) return;
+        if (!mapInstance.current || !window.L || !mapReady || !basePosition.length) return;
 
         const map = mapInstance.current;
 
-        const detectingIds = new Set(detectingCameras?.map(cam => typeof cam === 'object' ? cam.cameraId : cam) || []);
+        const validMarkerIds = new Set();
 
-        baseLayersRef.current.forEach(layer => map.removeLayer(layer));
+        basePosition.forEach((b) => {
+            const markerId = String(b.id);
+            validMarkerIds.add(markerId);
+
+            let marker = markerMapRef.current.get(markerId);
+            if (!marker) {
+                marker = window.L.marker([b.lat, b.lng], {
+                    icon: createBaseIcon((b.name || "ไม่ทราบชื่อ").split(' ')[0], b.status || 'inactive'),
+                    cameraId: markerId,
+                    zIndexOffset: 1000
+                }).addTo(map);
+                markerMapRef.current.set(markerId, marker);
+            }
+        });
+
+        markerMapRef.current.forEach((marker, markerId) => {
+            if (!validMarkerIds.has(markerId)) {
+                if (marker && map.hasLayer(marker)) {
+                    marker.remove();
+                }
+                markerMapRef.current.delete(markerId);
+            }
+        });
+    }, [basePosition, mapReady]);
+
+    useEffect(() => {
+        if (!mapInstance.current || !window.L || !mapReady || !enrichedBasePosition.length) return;
+
+        const map = mapInstance.current;
+        const detectingIds = new Set(detectingCameras?.map(cam => typeof cam === 'object' ? cam.cameraId : cam) || []);
+        const openPopupCameraId = map._popup?.isOpen() ? map._popup._source?.options?.cameraId : null;
+
+        baseLayersRef.current.forEach(layer => {
+            if (layer && map.hasLayer(layer)) {
+                map.removeLayer(layer);
+            }
+        });
         baseLayersRef.current = [];
 
         enrichedBasePosition.forEach(b => {
@@ -332,11 +369,22 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
                 zIndexOffset: -50,
             }).addTo(map);
 
-            const marker = window.L.marker([b.lat, b.lng], {
-                icon: createBaseIcon((b.name || "ไม่ทราบชื่อ").split(' ')[0], status)
-            }).addTo(map).bindPopup(createBasePopupContent(b, b.live));
+            const markerId = String(b.id);
+            const marker = markerMapRef.current.get(markerId);
+            if (!marker) return;
 
-            baseLayersRef.current.push(fovPolygon, directionLineCasing, directionLine, directionArrowHead, marker);
+            marker.setLatLng([b.lat, b.lng]);
+            marker.setIcon(createBaseIcon((b.name || "ไม่ทราบชื่อ").split(' ')[0], status));
+            marker.setPopupContent(createBasePopupContent(b, b.live));
+            if (!marker._popup) {
+                marker.bindPopup(createBasePopupContent(b, b.live));
+            }
+
+            if (String(b.id) === openPopupCameraId) {
+                marker.openPopup();
+            }
+
+            baseLayersRef.current.push(fovPolygon, directionLineCasing, directionLine, directionArrowHead);
         });
     }, [detectingCameras, enrichedBasePosition, mapReady]);
 

@@ -36,14 +36,14 @@ const ControlBtn = memo(function ControlBtn({ children, className = '', onClick,
 });
 
 const directionLabels = (degree) => {
-  if (degree >= 337.5 || degree < 22.5) return `N (${degree})`;
-  if (degree >= 22.5 && degree < 67.5) return `NE (${degree})`;
-  if (degree >= 67.5 && degree < 112.5) return `E (${degree})`;
-  if (degree >= 112.5 && degree < 157.5) return `SE (${degree})`;
-  if (degree >= 157.5 && degree < 202.5) return `S (${degree})`;
-  if (degree >= 202.5 && degree < 247.5) return `SW (${degree})`;
-  if (degree >= 247.5 && degree < 292.5) return `W (${degree})`;
-  if (degree >= 292.5 && degree < 337.5) return `NW (${degree})`;
+  if (degree >= 337.5 || degree < 22.5) return `เหนือ (${degree}°)`;
+  if (degree >= 22.5 && degree < 67.5) return `ตะวันออกเฉียงเหนือ (${degree}°)`;
+  if (degree >= 67.5 && degree < 112.5) return `ออก (${degree}°)`;
+  if (degree >= 112.5 && degree < 157.5) return `ตะวันออกเฉียงใต้ (${degree}°)`;
+  if (degree >= 157.5 && degree < 202.5) return `ใต้ (${degree}°)`;
+  if (degree >= 202.5 && degree < 247.5) return `ตะวันตกเฉียงใต้ (${degree}°)`;
+  if (degree >= 247.5 && degree < 292.5) return `ตก (${degree}°)`;
+  if (degree >= 292.5 && degree < 337.5) return `ตะวันตกเฉียงเหนือ (${degree}°)`;
   return "ไม่ทราบทิศทาง";
 };
 

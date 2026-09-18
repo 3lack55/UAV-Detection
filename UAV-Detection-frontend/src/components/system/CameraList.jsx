@@ -28,7 +28,7 @@ const EMPTY_FORM = {
     camera_name: "",
     latitude: "",
     longitude: "",
-    status: "active",
+    status: "inactive",
 };
 
 const DEFAULT_MAP_CENTER = [14.9844, 102.1189];
