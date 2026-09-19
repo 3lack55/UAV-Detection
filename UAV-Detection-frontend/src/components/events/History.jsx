@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Camera, Clock, AlertTriangle, CheckCircle2, Target, ChevronDown } from 'lucide-react';
+import { Camera, Clock, CheckCircle2, ChevronDown, CalendarDays } from 'lucide-react';
 import { EventDetailModal } from './EventDetailModal';
 
 import { getEventDetails, markEventAsRead } from "../../services/eventApi";
@@ -11,13 +11,38 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
     const [eventDetails, setEventDetails] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [visibleReadCount, setVisibleReadCount] = useState(PAGE_SIZE);
+    const [selectedCameraId, setSelectedCameraId] = useState('all');
+    const [selectedStatus, setSelectedStatus] = useState('all');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+
+    const matchesFilter = (event) => {
+        const matchesCamera = selectedCameraId === 'all' || String(event.camera_id) === String(selectedCameraId);
+        const matchesStatus = selectedStatus === 'all' || Number(event.seen) === Number(selectedStatus === 'unread' ? 0 : 1);
+
+        let matchesDate = true;
+        if (startDate || endDate) {
+            const eventDate = new Date(event.start_time || event.end_time || Date.now());
+            const eventDateValue = new Date(eventDate.getTime() - (eventDate.getTimezoneOffset() * 60000));
+            const eventDay = eventDateValue.toISOString().slice(0, 10);
+
+            if (startDate && eventDay < startDate) matchesDate = false;
+            if (endDate && eventDay > endDate) matchesDate = false;
+        }
+
+        return matchesCamera && matchesStatus && matchesDate;
+    };
+
+    const filteredUnReadEvents = useMemo(() => unReadEvents.filter(matchesFilter), [unReadEvents, selectedCameraId, selectedStatus, startDate, endDate]);
+    const filteredReadEvents = useMemo(() => readEvents.filter(matchesFilter), [readEvents, selectedCameraId, selectedStatus, startDate, endDate]);
 
     useEffect(() => {
         setVisibleReadCount(PAGE_SIZE);
-    }, [readEvents.length]);
+    }, [filteredReadEvents.length]);
 
-    const visibleReadEvents = readEvents.slice(0, visibleReadCount);
-    const hasMoreRead = readEvents.length > visibleReadCount;
+    const visibleReadEvents = filteredReadEvents.slice(0, visibleReadCount);
+    const hasMoreRead = filteredReadEvents.length > visibleReadCount;
+    const totalFilteredEvents = filteredUnReadEvents.length + filteredReadEvents.length;
 
     const fetchEventDetails = async (eventId) => {
         setIsFetching(true);
@@ -74,10 +99,87 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
     return (
 
         <div className="w-full h-full flex flex-col text-white bg-slate-800/30">
+            <div className="border-b border-slate-700 bg-slate-900/40 px-3 py-2.5">
+                <div className="grid grid-cols-2 gap-2">
+                    <label className="flex flex-col gap-1 text-[10px] text-slate-400">
+                        <span>กล้อง</span>
+                        <select
+                            value={selectedCameraId}
+                            onChange={(e) => setSelectedCameraId(e.target.value)}
+                            className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-sky-500"
+                        >
+                            <option value="all">ทุกกล้อง</option>
+                            {cameras
+                                .filter((camera) => camera && camera.camera_id != null)
+                                .map((camera) => (
+                                    <option key={camera.camera_id} value={camera.camera_id}>
+                                        {camera.camera_name || `Camera ${camera.camera_id}`}
+                                    </option>
+                                ))}
+                        </select>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-[10px] text-slate-400">
+                        <span>สถานะ</span>
+                        <select
+                            value={selectedStatus}
+                            onChange={(e) => setSelectedStatus(e.target.value)}
+                            className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-sky-500"
+                        >
+                            <option value="all">ทั้งหมด</option>
+                            <option value="unread">ยังไม่ได้ดู</option>
+                            <option value="read">ดูแล้ว</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                    <label className="flex flex-col gap-1 text-[10px] text-slate-400">
+                        <span>วันที่เริ่มต้น</span>
+                        <div className="relative">
+                            <CalendarDays size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" />
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="w-full rounded-md border border-slate-600 bg-slate-800 pl-7 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:border-sky-500"
+                            />
+                        </div>
+                    </label>
+
+                    <label className="flex flex-col gap-1 text-[10px] text-slate-400">
+                        <span>วันที่สิ้นสุด</span>
+                        <div className="relative">
+                            <CalendarDays size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" />
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="w-full rounded-md border border-slate-600 bg-slate-800 pl-7 pr-2 py-1.5 text-xs text-slate-200 outline-none focus:border-sky-500"
+                            />
+                        </div>
+                    </label>
+                </div>
+
+                {(selectedCameraId !== 'all' || selectedStatus !== 'all' || startDate || endDate) && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSelectedCameraId('all');
+                            setSelectedStatus('all');
+                            setStartDate('');
+                            setEndDate('');
+                        }}
+                        className="mt-2 text-[10px] font-medium text-sky-300 hover:text-sky-200"
+                    >
+                        ล้างตัวกรอง
+                    </button>
+                )}
+            </div>
 
             {/* List Container */}
             <div className='w-full h-full p-3 custom-scrollbar overflow-y-auto flex flex-col gap-2'>
-                {events.length === 0 ? (
+                {totalFilteredEvents === 0 ? (
                     // Empty State
                     <div className="h-40 mt-4 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700 rounded-xl bg-slate-800/30">
                         <Camera size={32} className="mb-2 opacity-50" />
@@ -86,7 +188,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                 ) : (
                     <>
                         {/* Unread Events (NEW) - always shown in full, these are active alerts */}
-                        {unReadEvents.map((e) => (
+                        {filteredUnReadEvents.map((e) => (
                             <div
                                 key={`unread-${e.event_id}`}
                                 className={`relative w-full p-2.5 rounded-lg transition-all duration-200 cursor-pointer
@@ -171,7 +273,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                         ))}
 
                         {/* Pagination control for read history */}
-                        {readEvents.length > 0 && (
+                        {filteredReadEvents.length > 0 && (
                             <div className="flex flex-col items-center gap-1.5 pt-1 pb-2">
                                 {hasMoreRead && (
                                     <button
@@ -183,7 +285,7 @@ export function History({ events, setEvents, unReadEvents, readEvents, isFetchin
                                     </button>
                                 )}
                                 <span className="text-[10px] text-slate-600">
-                                    แสดง {visibleReadEvents.length} จาก {readEvents.length} รายการ
+                                    แสดง {visibleReadEvents.length} จาก {filteredReadEvents.length} รายการ
                                 </span>
                             </div>
                         )}

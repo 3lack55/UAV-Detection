@@ -143,7 +143,7 @@ const createSectorPoints = (lat, lng, radius, heading, status, fov = 65) => {
 };
 
 // --- Main Component ---
-const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }) {
+const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras, permissionMap = {}, onCameraSelect }) {
     const mapContainerRef = useRef(null);
     const mapInstance = useRef(null);
     const tileLayerRef = useRef(null);
@@ -317,6 +317,12 @@ const BoboMap = memo(function BoboMap({ base, selectedCamera, detectingCameras }
                     cameraId: markerId,
                     zIndexOffset: 1000
                 }).addTo(map);
+
+                marker.on('click', () => {
+                    const hasPermission = permissionMap[b.id];
+                    onCameraSelect?.(b.id, hasPermission);
+                });
+
                 markerMapRef.current.set(markerId, marker);
             }
         });

@@ -68,7 +68,7 @@ export default function Dashboard() {
   } = useCameraFullscreen();
 
   const handleCameraClick = (cameraId, permission) => {
-    if (cameraId === cameraID) return;
+    if (cameraId === selectedCameraID) return;
 
     if (!permission) {
       setAlertMessage("คุณไม่มีสิทธิ์เข้าถึงกล้องนี้ กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์การเข้าถึง");
@@ -104,6 +104,8 @@ export default function Dashboard() {
               base={basePosition}
               selectedCamera={cameraID}
               detectingCameras={detectingCameras}
+              permissionMap={permissionMap}
+              onCameraSelect={handleCameraClick}
             />
             <CameraViewerPanel
               camera={cameraList.find((camera) => camera.camera_id === cameraID)}
