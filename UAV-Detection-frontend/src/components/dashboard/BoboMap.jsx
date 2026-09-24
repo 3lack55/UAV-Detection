@@ -8,6 +8,18 @@ const DEFAULT_CENTER = [{ lat: 14.9844, lng: 102.1189 }];
 const COLORS = { active: '#22DD5D', warning: '#FACC15', threat: '#FF4444', inactive: '#6D7280', maintenance: '#F4D03F' };
 const STATUS_TEXT = { active: 'ปกติ', warning: 'เฝ้าระวัง', threat: 'คุกคาม', inactive: 'ไม่ทำงาน', maintenance: 'บำรุงรักษา' };
 
+const directionLabels = (degree) => {
+  if (degree >= 337.5 || degree < 22.5) return `เหนือ (${degree}°)`;
+  if (degree >= 22.5 && degree < 67.5) return `ตะวันออกเฉียงเหนือ (${degree}°)`;
+  if (degree >= 67.5 && degree < 112.5) return `ออก (${degree}°)`;
+  if (degree >= 112.5 && degree < 157.5) return `ตะวันออกเฉียงใต้ (${degree}°)`;
+  if (degree >= 157.5 && degree < 202.5) return `ใต้ (${degree}°)`;
+  if (degree >= 202.5 && degree < 247.5) return `ตะวันตกเฉียงใต้ (${degree}°)`;
+  if (degree >= 247.5 && degree < 292.5) return `ตก (${degree}°)`;
+  if (degree >= 292.5 && degree < 337.5) return `ตะวันตกเฉียงเหนือ (${degree}°)`;
+  return "ไม่ทราบทิศทาง";
+};
+
 const createBaseIcon = (label = "CAM", status = "maintenance") => {
     if (!window.L) return null;
     return window.L.divIcon({
@@ -57,7 +69,7 @@ const createBasePopupContent = (base, live) => `
 
             <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
                 <span style="color: #cbd5e1; font-size: 11px;">ทิศติดตั้ง:</span>
-                <span style="font-size: 12px; color: ${COLORS[base.status]}; font-weight: 900; font-family: monospace;">${live ? live.installFace : base.heading}°</span>
+                <span style="font-size: 12px; color: ${COLORS[base.status]}; font-weight: 900; font-family: monospace;">${live ? directionLabels(live.installFace.toFixed(2)) : directionLabels(base.heading.toFixed(2)) }</span>
             </div>
 
             ${live ? `
@@ -67,7 +79,7 @@ const createBasePopupContent = (base, live) => `
             </div>
             <div style="margin-top: 6px; display: flex; align-items: center; justify-content: space-between;">
                 <span style="font-size: 10px; color: #64748b; font-weight: bold;">CURRENT HEADING:</span>
-                <span style="font-size: 12px; color: #e2e8f0; font-weight: 900; font-family: monospace;">${live.currentHeading}°</span>
+                <span style="font-size: 12px; color: #e2e8f0; font-weight: 900; font-family: monospace;">${directionLabels(live.currentHeading.toFixed(2))}</span>
             </div>
             ` : ''}
         </div>
