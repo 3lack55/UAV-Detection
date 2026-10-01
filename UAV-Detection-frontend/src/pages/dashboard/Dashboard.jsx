@@ -163,7 +163,7 @@ export default function Dashboard() {
                 `}
                 onClick={() => setSideTab('situation')}
               >
-                <p className="text-center text-lg">สถานการณ์</p>
+                <p className="text-center text-lg">กล้อง และสถานการณ์</p>
                 {(detectingCameras.length > 0 && rightTabOn) && (
                   <div className="absolute top-2 right-2">
                     <div className="threat-badge-pulse inline-flex items-center justify-center w-8 h-6 text-xs font-bold text-white bg-red-600 rounded-full border-2 border-red-400 shadow-lg">

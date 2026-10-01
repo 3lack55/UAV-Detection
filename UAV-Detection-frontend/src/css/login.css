@@ -3,12 +3,42 @@
 .login-bg {
     min-height: 100vh;
     display: flex;
+    flex-direction: column;
+    gap: 20px;
     align-items: center;
     justify-content: center;
     background: radial-gradient(ellipse at 20% 50%, #0d1f3c 0%, #050d1a 50%, #000510 100%);
     font-family: 'Kanit', sans-serif;
     position: relative;
     overflow: hidden;
+    box-sizing: border-box;
+    padding: 28px 16px;
+}
+
+.project-title,
+.project-credit {
+    position: relative;
+    z-index: 10;
+    width: min(760px, 100%);
+    text-align: center;
+}
+.project-title {
+    color: #e2f3ff;
+    font-size: 1.6rem;
+    font-weight: 600;
+    line-height: 1.45;
+    margin: 0;
+}
+.project-title span { display: block; }
+.project-credit {
+    color: rgba(191, 219, 254, 0.72);
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+.project-credit p { margin: 0; }
+
+@media (max-width: 600px) {
+    .project-title { font-size: 1.2rem; }
 }
 
 /* Card — glass pane, tinted to match this page's own palette
@@ -16,8 +46,9 @@
 .login-card {
     position: relative;
     z-index: 10;
-    width: 380px;
+    width: min(452px, 100%);
     padding: 40px 36px 36px;
+    box-sizing: border-box;
     border-radius: 24px;
     background: rgba(13, 30, 56, 0.5);
     backdrop-filter: blur(6px) saturate(150%);

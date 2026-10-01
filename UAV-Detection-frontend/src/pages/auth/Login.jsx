@@ -225,6 +225,10 @@ export default function Login() {
     return (
             <div className="login-bg">
                 <DroneCanvas />
+                <h1 className="project-title">
+                    <span>ระบบแสดงและควบคุมอุปกรณ์กล้องสำหรับ</span>
+                    <span>ตรวจจับอากาศยานไร้คนขับผ่านเว็บแอปพลิเคชัน</span>
+                </h1>
                 <div className={`login-card ${mounted ? "mounted" : ""}`}>
                     {/* Logo */}
                     <div className="logo-ring">
@@ -296,6 +300,10 @@ export default function Login() {
                         <Link to="/register" className="footer-link">สมัครสมาชิก</Link>
                     </p>
                 </div>
+                <footer className="project-credit">
+                    <p>© 2026 นายอำนาจ พิมพ์ปรุ และนางสาวยุรารัตน์ ศิริมงคลขจร</p>
+                    <p>สาขาวิศวกรรมคอมพิวเตอร์ มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน</p>
+                </footer>
             </div>
     );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStreamViewer } from '../../context/useStreamViewer';
 
-const StreamViewer = ({ onControlReady }) => {
+const StreamViewer = ({ onControlReady, showOverlay }) => {
     const { frame, metaData, status, fpsDisplay, isCameraConnected, sendControlMessage } = useStreamViewer();
     const [res, setRes] = useState({ w: 0, h: 0 });
     const canvasRef = useRef(null);
@@ -82,26 +82,28 @@ const StreamViewer = ({ onControlReady }) => {
 
     return (
         <div className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
-            <div className="absolute top-4 left-4 pointer-events-none bg-black/70 text-white text-xs px-3 py-2 rounded font-mono backdrop-blur-sm z-10 border border-gray-700">
-                <div className={`font-bold text-lg mb-1 ${status.includes('Ready') ? 'text-green-400' : 'text-red-400'}`}>
-                    {status}
-                </div>
-
-                {isCameraConnected ? (
-                    <div className="space-y-1">
-                        <div className="flex gap-4">
-                            <span className="text-gray-400">FPS:</span>
-                            <span className="text-yellow-400 font-bold">{fpsDisplay}</span>
-                        </div>
-                        <div className="flex gap-4">
-                            <span className="text-gray-400">Res:</span>
-                            <span className="text-blue-400">{res.w}x{res.h}</span>
-                        </div>
+            {showOverlay && (
+                <div className="absolute top-4 left-4 pointer-events-none bg-black/70 text-white text-xs px-3 py-2 rounded font-mono backdrop-blur-sm z-10 border border-gray-700">
+                    <div className={`font-bold text-lg mb-1 ${status.includes('Ready') ? 'text-green-400' : 'text-red-400'}`}>
+                        {status}
                     </div>
-                ) : (
-                    <div className="text-red-400 font-bold animate-pulse">Camera Disconnected</div>
-                )}
-            </div>
+
+                    {isCameraConnected ? (
+                        <div className="space-y-1">
+                            <div className="flex gap-4">
+                                <span className="text-gray-400">FPS:</span>
+                                <span className="text-yellow-400 font-bold">{fpsDisplay}</span>
+                            </div>
+                            <div className="flex gap-4">
+                                <span className="text-gray-400">Res:</span>
+                                <span className="text-blue-400">{res.w}x{res.h}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-red-400 font-bold animate-pulse">Camera Disconnected</div>
+                    )}
+                </div>
+            )}
 
             <canvas
                 ref={canvasRef}

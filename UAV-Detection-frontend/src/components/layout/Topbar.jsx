@@ -153,8 +153,8 @@ function Topbar() {
                 <div className="flex items-center gap-3">
                     <Drone className="w-6 h-6 text-blue-400 rotate-[30deg]" />
                     <div>
-                        <h1 className="text-xl font-bold max-sm:hidden">Bobo's Command Center</h1>
-                        <h1 className="text-xl font-bold sm:hidden">Command Center</h1>
+                        <h1 className="text-xl font-semibold tracking-wide max-sm:hidden">Camera Monitor and Control</h1>
+                        <h1 className="text-xl font-semibold tracking-wide sm:hidden">Command Center</h1>
                     </div>
                 </div>
                 <div className="flex items-center gap-6">

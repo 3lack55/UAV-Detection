@@ -263,6 +263,10 @@ export default function Register() {
     return (
             <div className="register-bg">
                 <DroneCanvas />
+                <h1 className="project-title-r">
+                    <span>ระบบแสดงและควบคุมอุปกรณ์กล้องสำหรับ</span>
+                    <span>ตรวจจับอากาศยานไร้คนขับผ่านเว็บแอปพลิเคชัน</span>
+                </h1>
                 <div className={`register-card ${mounted ? "mounted" : ""}`}>
                     {/* Logo */}
                     <div className="logo-ring-r">
@@ -370,6 +374,10 @@ export default function Register() {
                         <Link to="/login" className="footer-link-r">เข้าสู่ระบบ</Link>
                     </p>
                 </div>
+                <footer className="project-credit-r">
+                    <p>© 2026 นายอำนาจ พิมพ์ปรุ และนางสาวยุรารัตน์ ศิริมงคลขจร</p>
+                    <p>สาขาวิศวกรรมคอมพิวเตอร์ มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน</p>
+                </footer>
             </div>
     );
 }
